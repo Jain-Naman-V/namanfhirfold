@@ -29,7 +29,7 @@ interface SplitWorkbenchProps {
   setQueryFilter: (q: string) => void;
   onlyAbnormal: boolean;
   setOnlyAbnormal: (b: boolean) => void;
-  onSelectSample: (sampleKey: "hemoglobin" | "20_labs" | "full_cds" | "custom") => void;
+  onSelectSample: (sampleKey: "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom") => void;
   selectedSample: string;
 }
 
@@ -126,6 +126,16 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
               Select Preset Bundle:
             </span>
             <button
+              onClick={() => onSelectSample("careplan")}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-colors ${
+                selectedSample === "careplan"
+                  ? "bg-purple-500/10 border-purple-500/40 text-purple-700 dark:text-purple-300 font-bold"
+                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+              }`}
+            >
+              ⭐ CarePlan (User's Example • 593 → 82 Tok)
+            </button>
+            <button
               onClick={() => onSelectSample("hemoglobin")}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-colors ${
                 selectedSample === "hemoglobin"
@@ -133,7 +143,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
-              1. Hemoglobin (1 Obs • 248 → 27 Tok)
+              Hemoglobin (1 Obs • 248 → 27 Tok)
             </button>
             <button
               onClick={() => onSelectSample("20_labs")}
@@ -143,7 +153,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
-              2. 20-Lab Panel (4,200 → 280 Tok)
+              20-Lab Panel (4,200 → 280 Tok)
             </button>
             <button
               onClick={() => onSelectSample("full_cds")}
@@ -153,7 +163,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
-              3. Inpatient CDS Bundle
+              Inpatient CDS Bundle
             </button>
             
             {/* Upload File */}
@@ -295,7 +305,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
               -{result.reductionPercentage}%
             </div>
             <div className="text-[11px] font-bold text-gray-700 dark:text-gray-300 mt-0.5">
-              Tokens Reduced
+              Input-Token Reduction
             </div>
 
             <div className="mt-3 pt-3 border-t border-emerald-500/20 w-full space-y-1.5 text-[11px] text-left font-mono">
@@ -315,9 +325,17 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
               </div>
             </div>
 
-            {/* Cost savings badge */}
-            <div className="mt-3 w-full p-2 rounded-lg bg-emerald-500/10 text-[10px] text-emerald-800 dark:text-emerald-300 font-sans">
-              <strong>Cost Savings:</strong> ~{Math.max(2, Math.round(result.rawTokens / Math.max(1, result.compressedTokens)))}x cheaper per LLM prompt call
+            {/* Token ratio badge */}
+            <div className="mt-3 w-full p-2 rounded-lg bg-blue-500/10 text-[10px] text-blue-800 dark:text-blue-300 font-sans font-semibold">
+              ~{result.tokenMultiple}× fewer input tokens
+            </div>
+
+            {/* Fact Retention badge */}
+            <div className="mt-1.5 w-full p-2 rounded-lg bg-purple-500/10 text-[10px] text-purple-800 dark:text-purple-300 font-sans flex items-center justify-between">
+              <span>Facts Intact:</span>
+              <span className="font-bold text-purple-700 dark:text-purple-300">
+                {result.preservedFactsCount}/{result.totalFacts} ({result.factRetentionRate}%)
+              </span>
             </div>
           </div>
         </div>

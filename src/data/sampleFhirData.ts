@@ -1,7 +1,89 @@
 /**
  * Realistic FHIR R4 Test Payloads
- * Includes user's exact Hemoglobin example, a 20-Lab CBC/Metabolic Panel, and Full Inpatient CDS Bundle.
+ * Includes user's exact Hemoglobin example, Minor Surgery CarePlan with clinical activities, 20-Lab Panel, and Full Inpatient CDS Bundle.
  */
+
+// Post-Operative CarePlan with Clinical Instructions (User's Exact Example)
+export const SAMPLE_CAREPLAN_SURGERY = {
+  resourceType: "CarePlan",
+  id: "cp-minor-surgery-001",
+  meta: {
+    profile: ["http://hl7.org/fhir/StructureDefinition/CarePlan"],
+    versionId: "2",
+    lastUpdated: "2023-02-13T14:22:18Z"
+  },
+  text: {
+    status: "generated",
+    div: "<div xmlns=\"http://www.w3.org/1999/xhtml\">Post-operative care management plan following minor surgical procedure.</div>"
+  },
+  status: "completed",
+  intent: "order",
+  category: [
+    {
+      coding: [
+        {
+          system: "http://snomed.info/sct",
+          code: "385805005",
+          display: "Minor surgery care management"
+        }
+      ],
+      text: "Minor surgery care management"
+    }
+  ],
+  title: "Minor Surgery Recovery Plan",
+  description: "Post-procedural recovery and physical restriction protocol",
+  subject: {
+    reference: "Patient/P001",
+    display: "Rajesh Kumar Sharma"
+  },
+  encounter: {
+    reference: "Encounter/enc-surg-001"
+  },
+  period: {
+    start: "2023-02-13",
+    end: "2023-03-02"
+  },
+  careTeam: [
+    {
+      reference: "Practitioner/surg-dr-01",
+      display: "Dr. Ananya Roy, MD"
+    }
+  ],
+  activity: [
+    {
+      detail: {
+        code: {
+          coding: [
+            {
+              system: "http://snomed.info/sct",
+              code: "281036007",
+              display: "Recommendation to rest"
+            }
+          ],
+          text: "Recommendation to rest"
+        },
+        status: "completed",
+        description: "Mandatory rest for 72 hours; avoid heavy lifting or strenuous activity."
+      }
+    },
+    {
+      detail: {
+        code: {
+          coding: [
+            {
+              system: "http://snomed.info/sct",
+              code: "416471007",
+              display: "Recommendation to limit sexual activity"
+            }
+          ],
+          text: "Recommendation to limit sexual activity"
+        },
+        status: "completed",
+        description: "Abstain from sexual intercourse for 2 weeks post-procedure to facilitate wound healing."
+      }
+    }
+  ]
+};
 
 export const SAMPLE_HEMOGLOBIN = {
   resourceType: "Observation",

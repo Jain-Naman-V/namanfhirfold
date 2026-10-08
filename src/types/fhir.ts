@@ -78,6 +78,15 @@ export interface CompressedFieldSummary {
   stripped: string[];
 }
 
+export interface ClinicalFact {
+  id: string;
+  resourceType: string;
+  category: "Activity" | "Dosage" | "Finding" | "Diagnosis" | "Range" | "Temporal" | "Instruction" | "Allergen";
+  label: string;
+  value: string;
+  preserved: boolean;
+}
+
 export interface CompressionResult {
   rawJson: string;
   compressedOutput: string;
@@ -87,8 +96,13 @@ export interface CompressionResult {
   rawTokens: number;
   compressedTokens: number;
   reductionPercentage: number;
+  tokenMultiple: number; // e.g. 15.2x fewer input tokens
   retainedFields: string[];
   strippedFields: string[];
+  clinicalFacts: ClinicalFact[];
+  totalFacts: number;
+  preservedFactsCount: number;
+  factRetentionRate: number; // e.g. 100%
   resourceBreakdown: {
     resourceType: string;
     rawCount: number;

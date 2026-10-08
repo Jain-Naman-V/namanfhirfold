@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import {
+  SAMPLE_CAREPLAN_SURGERY,
   SAMPLE_HEMOGLOBIN,
   SAMPLE_20_LAB_PANEL,
   SAMPLE_FULL_CDS_BUNDLE,
@@ -28,24 +29,24 @@ import {
   Package,
 } from "lucide-react";
 
-type SampleKey = "hemoglobin" | "20_labs" | "full_cds" | "custom";
+type SampleKey = "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom";
 type TabKey = "workbench" | "package_hub" | "benchmark" | "architecture" | "rust_crate";
 
 export default function App() {
-  const [selectedSample, setSelectedSample] = useState<SampleKey>("hemoglobin");
+  const [selectedSample, setSelectedSample] = useState<SampleKey>("careplan");
   const [activeTab, setActiveTab] = useState<TabKey>("workbench");
   const [format, setFormat] = useState<CompressionFormat>("compact_json");
   const [queryFilter, setQueryFilter] = useState<string>("");
   const [onlyAbnormal, setOnlyAbnormal] = useState<boolean>(false);
 
-  // Raw JSON input text
+  // Raw JSON input text (default to CarePlan to verify the user's exact scenario!)
   const [rawJsonText, setRawJsonText] = useState<string>(() =>
-    JSON.stringify(SAMPLE_HEMOGLOBIN, null, 2)
+    JSON.stringify(SAMPLE_CAREPLAN_SURGERY, null, 2)
   );
 
   // Compression result state
   const [result, setResult] = useState<CompressionResult>(() => {
-    return compressFhir(SAMPLE_HEMOGLOBIN, {
+    return compressFhir(SAMPLE_CAREPLAN_SURGERY, {
       format: "compact_json",
       stripMeta: true,
       stripNarrativeText: true,
@@ -59,7 +60,10 @@ export default function App() {
   const handleSelectSample = (sample: SampleKey) => {
     setSelectedSample(sample);
     let newPayload: any;
-    if (sample === "hemoglobin") {
+    if (sample === "careplan") {
+      newPayload = SAMPLE_CAREPLAN_SURGERY;
+      setQueryFilter("");
+    } else if (sample === "hemoglobin") {
       newPayload = SAMPLE_HEMOGLOBIN;
       setQueryFilter("");
     } else if (sample === "20_labs") {
@@ -111,11 +115,11 @@ export default function App() {
                     ClinContext FHIR
                   </h1>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Token Reducer & Package Hub
+                    Token Reducer & Fact Preserver
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Left: Raw FHIR Bundle → Right: 85-94% Token-Compressed LLM Input
+                  Left: Raw FHIR Bundle → Right: Optimized Context (Token Reduction + 100% Fact Retention)
                 </p>
               </div>
             </div>
@@ -189,8 +193,12 @@ export default function App() {
           rawTokens={result.rawTokens}
           compressedTokens={result.compressedTokens}
           reductionPercentage={result.reductionPercentage}
+          tokenMultiple={result.tokenMultiple}
           rawChars={result.rawCharCount}
           compressedChars={result.compressedCharCount}
+          factRetentionRate={result.factRetentionRate}
+          preservedFactsCount={result.preservedFactsCount}
+          totalFacts={result.totalFacts}
         />
 
         {/* Tab 1: Split Workbench */}
@@ -210,10 +218,12 @@ export default function App() {
               selectedSample={selectedSample}
             />
 
-            {/* Field Explainer */}
+            {/* Field Explainer & Clinical Fact Auditor */}
             <FieldExplainer
               retainedFields={result.retainedFields}
               strippedFields={result.strippedFields}
+              clinicalFacts={result.clinicalFacts}
+              factRetentionRate={result.factRetentionRate}
             />
 
             {/* Live LLM Evaluator */}
@@ -248,7 +258,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
-        ClinContext Engine • FHIR R4 Ingestion & LLM Token Reducer for Healthcare AI Agents & CDS Hooks
+        ClinContext Engine • Standardized Metric: Token Reduction + Clinical Information Retention + Task Accuracy
       </footer>
     </div>
   );
