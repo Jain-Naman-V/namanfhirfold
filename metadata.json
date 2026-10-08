@@ -1,0 +1,7 @@
+{
+  "name": "ClinContext FHIR - LLM Token & Context Optimizer",
+  "description": "High-efficiency FHIR-to-LLM context optimization engine based on FHIRBench, MedPrompt & FHIR-MCP. Reduces token usage by 85%+ while preserving clinical fidelity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
