@@ -1,17 +1,24 @@
 /**
- * ClinContext FHIR - LLM Token & Context Optimizer
- * High-performance FHIR token compression engine based on FHIRBench, MedPrompt & FHIR-MCP.
+ * ClinContext FHIR - Task-Aware Context Optimizer & Provenance Engine
+ * High-performance FHIR token compression based on FHIRBench, MedPrompt & FHIR-MCP.
  */
 
 import React, { useState, useEffect } from "react";
 import {
+  SAMPLE_PAIN_SEVERITY,
   SAMPLE_CAREPLAN_SURGERY,
   SAMPLE_HEMOGLOBIN,
   SAMPLE_20_LAB_PANEL,
   SAMPLE_FULL_CDS_BUNDLE,
 } from "./data/sampleFhirData.ts";
 import { compressFhir } from "./services/fhirCompressor.ts";
-import { CompressionFormat, CompressionOptions, CompressionResult } from "./types/fhir.ts";
+import {
+  CompressionFormat,
+  CompressionOptions,
+  CompressionResult,
+  GranularityMode,
+  CdsProfile,
+} from "./types/fhir.ts";
 import { MetricCard } from "./components/MetricCard.tsx";
 import { FieldExplainer } from "./components/FieldExplainer.tsx";
 import { LlmEvaluator } from "./components/LlmEvaluator.tsx";
@@ -20,6 +27,7 @@ import { ArchitectureDiagram } from "./components/ArchitectureDiagram.tsx";
 import { CrateExporter } from "./components/CrateExporter.tsx";
 import { PackageHub } from "./components/PackageHub.tsx";
 import { SplitWorkbench } from "./components/SplitWorkbench.tsx";
+import { DocsViewer } from "./components/DocsViewer.tsx";
 import {
   Activity,
   Cpu,
@@ -27,27 +35,35 @@ import {
   Layers,
   Code2,
   Package,
+  BookOpen,
 } from "lucide-react";
 
-type SampleKey = "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom";
-type TabKey = "workbench" | "package_hub" | "benchmark" | "architecture" | "rust_crate";
+type SampleKey = "pain" | "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom";
+type TabKey = "workbench" | "package_hub" | "docs" | "benchmark" | "architecture" | "rust_crate";
 
 export default function App() {
-  const [selectedSample, setSelectedSample] = useState<SampleKey>("careplan");
+  const [selectedSample, setSelectedSample] = useState<SampleKey>("pain");
   const [activeTab, setActiveTab] = useState<TabKey>("workbench");
   const [format, setFormat] = useState<CompressionFormat>("compact_json");
-  const [queryFilter, setQueryFilter] = useState<string>("");
+  const [granularity, setGranularity] = useState<GranularityMode>("exact_timestamp");
+  const [profile, setProfile] = useState<CdsProfile>("free_query");
+  const [tokenBudget, setTokenBudget] = useState<number>(800);
+  const [queryFilter, setQueryFilter] = useState<string>("What was the patient's pain score?");
   const [onlyAbnormal, setOnlyAbnormal] = useState<boolean>(false);
 
-  // Raw JSON input text (default to CarePlan to verify the user's exact scenario!)
+  // Raw JSON input text (default to Pain Severity to verify vitalSigns categorization & exact timestamp!)
   const [rawJsonText, setRawJsonText] = useState<string>(() =>
-    JSON.stringify(SAMPLE_CAREPLAN_SURGERY, null, 2)
+    JSON.stringify(SAMPLE_PAIN_SEVERITY, null, 2)
   );
 
   // Compression result state
   const [result, setResult] = useState<CompressionResult>(() => {
-    return compressFhir(SAMPLE_CAREPLAN_SURGERY, {
+    return compressFhir(SAMPLE_PAIN_SEVERITY, {
       format: "compact_json",
+      granularity: "exact_timestamp",
+      profile: "free_query",
+      tokenBudget: 800,
+      queryFilter: "What was the patient's pain score?",
       stripMeta: true,
       stripNarrativeText: true,
       normalizeCodingSystems: true,
@@ -60,18 +76,26 @@ export default function App() {
   const handleSelectSample = (sample: SampleKey) => {
     setSelectedSample(sample);
     let newPayload: any;
-    if (sample === "careplan") {
+    if (sample === "pain") {
+      newPayload = SAMPLE_PAIN_SEVERITY;
+      setQueryFilter("What was the patient's pain score?");
+      setGranularity("exact_timestamp");
+    } else if (sample === "careplan") {
       newPayload = SAMPLE_CAREPLAN_SURGERY;
-      setQueryFilter("");
+      setQueryFilter("What instructions were given in this CarePlan?");
+      setGranularity("date_only");
     } else if (sample === "hemoglobin") {
       newPayload = SAMPLE_HEMOGLOBIN;
       setQueryFilter("");
+      setGranularity("date_only");
     } else if (sample === "20_labs") {
       newPayload = SAMPLE_20_LAB_PANEL;
       setQueryFilter("");
+      setGranularity("date_only");
     } else if (sample === "full_cds") {
       newPayload = SAMPLE_FULL_CDS_BUNDLE;
       setQueryFilter("");
+      setGranularity("date_only");
     } else {
       return;
     }
@@ -84,6 +108,9 @@ export default function App() {
     try {
       const opts: CompressionOptions = {
         format,
+        granularity,
+        profile,
+        tokenBudget,
         stripMeta: true,
         stripNarrativeText: true,
         normalizeCodingSystems: true,
@@ -97,7 +124,7 @@ export default function App() {
     } catch (err) {
       // keep previous valid result while typing invalid JSON
     }
-  }, [rawJsonText, format, queryFilter, onlyAbnormal]);
+  }, [rawJsonText, format, granularity, profile, tokenBudget, queryFilter, onlyAbnormal]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col font-sans">
@@ -115,11 +142,11 @@ export default function App() {
                     ClinContext FHIR
                   </h1>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Token Reducer & Fact Preserver
+                    Task-Aware Context Optimizer
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Left: Raw FHIR Bundle → Right: Optimized Context (Token Reduction + 100% Fact Retention)
+                  Left: Raw FHIR Bundle → Right: Task-Aware Context (Vitals vs Labs • Provenance Map • Safety Set)
                 </p>
               </div>
             </div>
@@ -147,6 +174,17 @@ export default function App() {
               >
                 <Package className="w-3.5 h-3.5 text-amber-500" />
                 <span>NPM / Rust Package</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("docs")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
+                  activeTab === "docs"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-purple-500" />
+                <span>Specs & Docs</span>
               </button>
               <button
                 onClick={() => setActiveTab("benchmark")}
@@ -178,7 +216,7 @@ export default function App() {
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
-                <Code2 className="w-3.5 h-3.5 text-purple-500" />
+                <Code2 className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Crate Code</span>
               </button>
             </nav>
@@ -212,6 +250,12 @@ export default function App() {
               setFormat={setFormat}
               queryFilter={queryFilter}
               setQueryFilter={setQueryFilter}
+              granularity={granularity}
+              setGranularity={setGranularity}
+              profile={profile}
+              setProfile={setProfile}
+              tokenBudget={tokenBudget}
+              setTokenBudget={setTokenBudget}
               onlyAbnormal={onlyAbnormal}
               setOnlyAbnormal={setOnlyAbnormal}
               onSelectSample={handleSelectSample}
@@ -240,17 +284,22 @@ export default function App() {
           <PackageHub />
         )}
 
-        {/* Tab 3: FHIRBench Benchmark Matrix */}
+        {/* Tab 3: System Specifications & Documentation */}
+        {activeTab === "docs" && (
+          <DocsViewer />
+        )}
+
+        {/* Tab 4: FHIRBench Benchmark Matrix */}
         {activeTab === "benchmark" && (
           <BenchmarkMatrix rawTokens={result.rawTokens} />
         )}
 
-        {/* Tab 4: Architecture Pipeline */}
+        {/* Tab 5: Architecture Pipeline */}
         {activeTab === "architecture" && (
           <ArchitectureDiagram />
         )}
 
-        {/* Tab 5: Rust & TS Crate Export */}
+        {/* Tab 6: Rust & TS Crate Export */}
         {activeTab === "rust_crate" && (
           <CrateExporter />
         )}

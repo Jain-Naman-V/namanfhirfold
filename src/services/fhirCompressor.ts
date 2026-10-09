@@ -1,10 +1,16 @@
 /**
- * High-Performance FHIR R4 Token Compressor & Clinical Fact Preservation Engine
- * Inspired by FHIRBench, MedPrompt (FHIR2Text), fhir-medrecon, and FHIR-MCP.
+ * ClinContext Task-Aware FHIR Context Optimizer
  * 
- * CORE CLINICAL CONSTITUTION:
- * "Token Reduction + Clinical Information Retention + Task Accuracy"
- * Never throw away actionable clinical facts (CarePlan activities, dosages, ranges, abnormal flags).
+ * CONTRACT:
+ * optimize(bundle, intent, token_budget) -> compact_context + provenance_map
+ * 
+ * 6-Stage Pipeline:
+ * 1. Parse & reference indexing
+ * 2. Lossless strip (meta, text.div, URIs, search wrappers)
+ * 3. Dedupe & safety validation (filter entered-in-error / refuted)
+ * 4. Task-aware intent & profile selection (CDS deterministic vs free query)
+ * 5. Ranking & Token Budgeting (guaranteed Safety Set: allergies, active meds, critical abnormal)
+ * 6. Provenance mapping (short refs: O1, M1, CP1) + Omission transparency
  */
 
 import {
@@ -13,23 +19,25 @@ import {
   CompressionOptions,
   CompressionResult,
   ClinicalFact,
+  ProvenanceEntry,
+  CdsProfile,
+  GranularityMode,
 } from "../types/fhir.ts";
 
-// Helper to normalize coding system URLs to compact human/LLM-readable identifiers
+// Prefix table for compact system identifiers
 function normalizeSystem(system?: string): string {
   if (!system) return "";
-  if (system.includes("loinc.org")) return "LOINC";
-  if (system.includes("snomed.info")) return "SNOMED";
-  if (system.includes("rxnorm") || system.includes("nlm.nih.gov")) return "RxNorm";
-  if (system.includes("unitsofmeasure.org") || system.includes("ucum")) return "UCUM";
-  if (system.includes("icd-10")) return "ICD-10";
-  if (system.includes("cpt")) return "CPT";
-  if (system.includes("cvx")) return "CVX";
+  if (system.includes("loinc.org")) return "loinc";
+  if (system.includes("snomed.info")) return "snomed";
+  if (system.includes("rxnorm") || system.includes("nlm.nih.gov")) return "rxnorm";
+  if (system.includes("unitsofmeasure.org") || system.includes("ucum")) return "ucum";
+  if (system.includes("icd-10")) return "icd10";
+  if (system.includes("cvx")) return "cvx";
   const parts = system.split("/").filter(Boolean);
   return parts[parts.length - 1] || system;
 }
 
-// Extract primary concept name and normalized code
+// Concept extraction helper
 function extractConcept(concept?: any): { name: string; code?: string; system?: string } {
   if (!concept) return { name: "Unknown" };
   const coding = concept.coding?.[0];
@@ -45,13 +53,56 @@ function extractConcept(concept?: any): { name: string; code?: string; system?: 
   return { name };
 }
 
-// Format date into short ISO YYYY-MM-DD
-function formatShortDate(dt?: string): string {
+// Check if an observation is a Vital Sign vs Laboratory
+function isVitalSign(obs: any): boolean {
+  // 1. Check FHIR category
+  if (obs.category && Array.isArray(obs.category)) {
+    for (const cat of obs.category) {
+      const code = cat.coding?.[0]?.code || "";
+      const display = cat.coding?.[0]?.display || cat.text || "";
+      if (code === "vital-signs" || display.toLowerCase().includes("vital")) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Check LOINC codes for known vital signs
+  const code = obs.code?.coding?.[0]?.code;
+  const vitalLoincs = [
+    "72514-3", // Pain severity
+    "85354-9", // Blood pressure panel
+    "8480-6",  // Systolic BP
+    "8462-4",  // Diastolic BP
+    "8867-4",  // Heart rate
+    "9279-1",  // Respiratory rate
+    "8310-5",  // Body temperature
+    "59408-5", // Oxygen saturation (SpO2)
+    "29463-7", // Body weight
+    "8302-2",  // Body height
+    "39156-5", // BMI
+  ];
+  if (code && vitalLoincs.includes(code)) return true;
+
+  const name = (obs.code?.text || obs.code?.coding?.[0]?.display || "").toLowerCase();
+  if (name.includes("pain") || name.includes("blood pressure") || name.includes("pulse") || name.includes("heart rate") || name.includes("temperature")) {
+    return true;
+  }
+
+  return false;
+}
+
+// Format date according to granularity
+function formatDateTime(dt?: string, granularity: GranularityMode = "date_only"): string {
   if (!dt) return "";
+  if (granularity === "exact_timestamp") {
+    // preserve full ISO timestamp e.g. 2015-06-05T18:21:10-04:00
+    return dt;
+  }
+  // date_only: YYYY-MM-DD
   return dt.split("T")[0];
 }
 
-// Format reference range string e.g. "13.0 - 17.0 g/dL"
+// Format reference range string e.g. "13.0-17.0 g/dL"
 function formatRefRange(ranges?: any[]): string | undefined {
   if (!ranges || ranges.length === 0) return undefined;
   const r = ranges[0];
@@ -65,373 +116,7 @@ function formatRefRange(ranges?: any[]): string | undefined {
   return undefined;
 }
 
-// 1. Observation extractor
-export function compressObservation(obs: any, opts: CompressionOptions): any | null {
-  const concept = extractConcept(obs.code);
-  let valStr: string | number = "";
-  let unit = "";
-
-  if (obs.valueQuantity) {
-    valStr = obs.valueQuantity.value ?? "";
-    unit = obs.valueQuantity.unit || obs.valueQuantity.code || "";
-  } else if (obs.valueString) {
-    valStr = obs.valueString;
-  } else if (obs.valueCodeableConcept) {
-    valStr = extractConcept(obs.valueCodeableConcept).name;
-  } else if (obs.component && Array.isArray(obs.component)) {
-    const comps = obs.component.map((c: any) => {
-      const cName = extractConcept(c.code).name;
-      const cVal = c.valueQuantity?.value;
-      const cUnit = c.valueQuantity?.unit || "";
-      return `${cName}: ${cVal} ${cUnit}`.trim();
-    });
-    valStr = comps.join(", ");
-  }
-
-  const range = formatRefRange(obs.referenceRange);
-  let interpretation: string | undefined = undefined;
-  if (obs.interpretation && obs.interpretation[0]) {
-    const interpCoding = obs.interpretation[0].coding?.[0];
-    interpretation = interpCoding?.code || interpCoding?.display || obs.interpretation[0].text;
-  }
-
-  const isAbnormal = !!interpretation && !["N", "normal", "Normal"].includes(interpretation.toLowerCase());
-  if (opts.onlyAbnormalLabs && !isAbnormal) {
-    return null;
-  }
-
-  const date = formatShortDate(obs.effectiveDateTime || obs.issued);
-
-  return {
-    test: concept.name,
-    code: concept.code ? `${concept.system ? concept.system + ":" : ""}${concept.code}` : undefined,
-    value: typeof valStr === "number" ? valStr : `${valStr} ${unit}`.trim(),
-    unit: typeof valStr === "number" ? unit || undefined : undefined,
-    range: range || undefined,
-    flag: interpretation || undefined,
-    date: date || undefined,
-    status: obs.status !== "final" ? obs.status : undefined,
-  };
-}
-
-// 2. CarePlan Extractor (Preserves clinical activities, instructions, categories, dates)
-export function compressCarePlan(cp: any): any {
-  // Extract category e.g. "Minor surgery care management"
-  let categoryName = "";
-  if (cp.category && cp.category[0]) {
-    categoryName = extractConcept(cp.category[0]).name;
-  }
-
-  // Extract period
-  let periodStr = "";
-  if (cp.period) {
-    const s = formatShortDate(cp.period.start);
-    const e = formatShortDate(cp.period.end);
-    if (s && e) periodStr = `${s} to ${e}`;
-    else if (s) periodStr = `From ${s}`;
-  }
-
-  // Extract activities & recommendations
-  const activities: string[] = [];
-  if (cp.activity && Array.isArray(cp.activity)) {
-    cp.activity.forEach((act: any) => {
-      let actText = "";
-      if (act.detail) {
-        const detailConcept = extractConcept(act.detail.code);
-        const desc = act.detail.description;
-        if (detailConcept.name !== "Unknown" && desc) {
-          actText = `${detailConcept.name}: ${desc}`;
-        } else if (detailConcept.name !== "Unknown") {
-          actText = detailConcept.name;
-        } else if (desc) {
-          actText = desc;
-        }
-      } else if (act.progress && act.progress[0]?.text) {
-        actText = act.progress[0].text;
-      }
-      if (actText) activities.push(actText);
-    });
-  }
-
-  return {
-    type: "CarePlan",
-    title: cp.title || undefined,
-    category: categoryName || undefined,
-    status: cp.status,
-    intent: cp.intent !== "plan" ? cp.intent : undefined,
-    period: periodStr || undefined,
-    activities: activities.length > 0 ? activities : undefined,
-  };
-}
-
-// 3. MedicationRequest extractor
-export function compressMedicationRequest(med: any): any {
-  const concept = extractConcept(med.medicationCodeableConcept);
-  let drugName = concept.name;
-  if (drugName === "Unknown" && med.medicationReference?.display) {
-    drugName = med.medicationReference.display;
-  }
-
-  let sig = "";
-  if (med.dosageInstruction && med.dosageInstruction[0]) {
-    const d = med.dosageInstruction[0];
-    sig = d.text || "";
-    if (!sig && d.doseAndRate && d.doseAndRate[0]) {
-      const dose = d.doseAndRate[0].doseQuantity;
-      const route = d.route?.coding?.[0]?.display || d.route?.text || "";
-      sig = `${dose?.value || ""} ${dose?.unit || ""} ${route}`.trim();
-    }
-  }
-
-  const date = formatShortDate(med.authoredOn);
-
-  return {
-    drug: drugName,
-    code: concept.code ? `${concept.system ? concept.system + ":" : ""}${concept.code}` : undefined,
-    sig: sig || undefined,
-    status: med.status,
-    date: date || undefined,
-  };
-}
-
-// 4. Condition extractor
-export function compressCondition(cond: any): any {
-  const concept = extractConcept(cond.code);
-  const status = cond.clinicalStatus?.coding?.[0]?.code || cond.clinicalStatus?.text;
-  const verification = cond.verificationStatus?.coding?.[0]?.code;
-  const onset = formatShortDate(cond.onsetDateTime || cond.recordedDate);
-  const severity = cond.severity?.coding?.[0]?.display || cond.severity?.text;
-
-  return {
-    condition: concept.name,
-    code: concept.code ? `${concept.system ? concept.system + ":" : ""}${concept.code}` : undefined,
-    status: status || undefined,
-    verification: verification || undefined,
-    severity: severity || undefined,
-    onset: onset || undefined,
-  };
-}
-
-// 5. AllergyIntolerance extractor
-export function compressAllergy(alg: any): any {
-  const concept = extractConcept(alg.code);
-  const criticality = alg.criticality;
-  const status = alg.clinicalStatus?.coding?.[0]?.code;
-  const reactions: string[] = [];
-  if (alg.reaction && Array.isArray(alg.reaction)) {
-    alg.reaction.forEach((r: any) => {
-      const manifest = r.manifestation?.[0]?.coding?.[0]?.display || r.manifestation?.[0]?.text;
-      const sev = r.severity;
-      if (manifest) reactions.push(sev ? `${manifest} (${sev})` : manifest);
-    });
-  }
-
-  return {
-    allergen: concept.name,
-    criticality: criticality || undefined,
-    status: status || undefined,
-    reactions: reactions.length > 0 ? reactions.join(", ") : undefined,
-  };
-}
-
-// 6. Patient extractor
-export function compressPatient(pat: any): any {
-  let name = "";
-  if (pat.name && pat.name[0]) {
-    const n = pat.name[0];
-    const given = Array.isArray(n.given) ? n.given.join(" ") : n.given || "";
-    const family = n.family || "";
-    name = `${given} ${family}`.trim();
-  }
-
-  let age: number | undefined = undefined;
-  if (pat.birthDate) {
-    const birthYear = new Date(pat.birthDate).getFullYear();
-    const currentYear = 2026;
-    age = currentYear - birthYear;
-  }
-
-  return {
-    id: pat.id || undefined,
-    name: name || undefined,
-    gender: pat.gender || undefined,
-    age: age || undefined,
-    dob: pat.birthDate || undefined,
-  };
-}
-
-// 7. Procedure extractor
-export function compressProcedure(proc: any): any {
-  const concept = extractConcept(proc.code);
-  const status = proc.status;
-  const date = formatShortDate(proc.performedDateTime || proc.performedPeriod?.start);
-  return {
-    procedure: concept.name,
-    code: concept.code ? `${concept.system ? concept.system + ":" : ""}${concept.code}` : undefined,
-    status,
-    date: date || undefined,
-  };
-}
-
-// 8. DiagnosticReport extractor
-export function compressDiagnosticReport(diag: any): any {
-  const concept = extractConcept(diag.code);
-  const conclusion = diag.conclusion;
-  const date = formatShortDate(diag.effectiveDateTime || diag.issued);
-  return {
-    report: concept.name,
-    conclusion: conclusion || undefined,
-    status: diag.status,
-    date: date || undefined,
-  };
-}
-
-// 9. Encounter extractor
-export function compressEncounter(enc: any): any {
-  const encClass = enc.class?.code || enc.class?.display;
-  const type = enc.type?.[0]?.coding?.[0]?.display || enc.type?.[0]?.text;
-  const reason = enc.reasonCode?.[0]?.coding?.[0]?.display || enc.reasonCode?.[0]?.text;
-  const date = formatShortDate(enc.period?.start);
-
-  return {
-    encounter: type || encClass || "Encounter",
-    class: encClass || undefined,
-    reason: reason || undefined,
-    date: date || undefined,
-    status: enc.status !== "finished" ? enc.status : undefined,
-  };
-}
-
-/**
- * CLINICAL FACT AUDITOR
- * Extracts atomic clinical facts from raw FHIR and audits if they survived in compressed context.
- */
-export function extractAndAuditFacts(resources: any[], compressedText: string): ClinicalFact[] {
-  const facts: ClinicalFact[] = [];
-  const textLower = compressedText.toLowerCase();
-
-  resources.forEach((res, rIdx) => {
-    const rt = res.resourceType;
-
-    // CarePlan Facts
-    if (rt === "CarePlan") {
-      if (res.category && res.category[0]) {
-        const cat = extractConcept(res.category[0]).name;
-        facts.push({
-          id: `fact-cp-cat-${rIdx}`,
-          resourceType: "CarePlan",
-          category: "Instruction",
-          label: "CarePlan Category",
-          value: cat,
-          preserved: textLower.includes(cat.toLowerCase()),
-        });
-      }
-      if (res.period?.start) {
-        const p = `${formatShortDate(res.period.start)} to ${formatShortDate(res.period.end)}`;
-        facts.push({
-          id: `fact-cp-period-${rIdx}`,
-          resourceType: "CarePlan",
-          category: "Temporal",
-          label: "CarePlan Period",
-          value: p,
-          preserved: textLower.includes(formatShortDate(res.period.start)),
-        });
-      }
-      if (res.activity && Array.isArray(res.activity)) {
-        res.activity.forEach((act: any, aIdx: number) => {
-          const name = extractConcept(act.detail?.code).name;
-          if (name && name !== "Unknown") {
-            facts.push({
-              id: `fact-cp-act-${rIdx}-${aIdx}`,
-              resourceType: "CarePlan",
-              category: "Activity",
-              label: `Activity #${aIdx + 1}`,
-              value: name,
-              preserved: textLower.includes(name.toLowerCase()),
-            });
-          }
-        });
-      }
-    }
-
-    // Observation Facts
-    if (rt === "Observation") {
-      const name = extractConcept(res.code).name;
-      let val = "";
-      if (res.valueQuantity) val = `${res.valueQuantity.value} ${res.valueQuantity.unit || ""}`.trim();
-      else if (res.valueString) val = res.valueString;
-
-      if (name && val) {
-        facts.push({
-          id: `fact-obs-${rIdx}`,
-          resourceType: "Observation",
-          category: "Finding",
-          label: name,
-          value: val,
-          preserved: textLower.includes(name.toLowerCase()) && textLower.includes(`${res.valueQuantity?.value ?? ""}`),
-        });
-      }
-
-      if (res.referenceRange && res.referenceRange[0]) {
-        const rr = formatRefRange(res.referenceRange);
-        if (rr) {
-          facts.push({
-            id: `fact-rr-${rIdx}`,
-            resourceType: "Observation",
-            category: "Range",
-            label: `${name} Range`,
-            value: rr,
-            preserved: textLower.includes(rr.split(" ")[0].toLowerCase()),
-          });
-        }
-      }
-    }
-
-    // MedicationRequest Facts
-    if (rt === "MedicationRequest") {
-      const drug = extractConcept(res.medicationCodeableConcept).name;
-      const sig = res.dosageInstruction?.[0]?.text;
-      facts.push({
-        id: `fact-med-${rIdx}`,
-        resourceType: "MedicationRequest",
-        category: "Dosage",
-        label: drug,
-        value: sig || "As prescribed",
-        preserved: textLower.includes(drug.toLowerCase().slice(0, 10)),
-      });
-    }
-
-    // Condition Facts
-    if (rt === "Condition") {
-      const cond = extractConcept(res.code).name;
-      facts.push({
-        id: `fact-cond-${rIdx}`,
-        resourceType: "Condition",
-        category: "Diagnosis",
-        label: cond,
-        value: res.clinicalStatus?.coding?.[0]?.code || "Active",
-        preserved: textLower.includes(cond.toLowerCase().slice(0, 8)),
-      });
-    }
-
-    // Allergy Facts
-    if (rt === "AllergyIntolerance") {
-      const alg = extractConcept(res.code).name;
-      facts.push({
-        id: `fact-alg-${rIdx}`,
-        resourceType: "AllergyIntolerance",
-        category: "Allergen",
-        label: alg,
-        value: res.criticality || "Critical",
-        preserved: textLower.includes(alg.toLowerCase().slice(0, 8)),
-      });
-    }
-  });
-
-  return facts;
-}
-
-// Main compression function
+// Main optimization function
 export function compressFhir(
   fhirPayload: string | object,
   options: CompressionOptions
@@ -445,36 +130,79 @@ export function compressFhir(
     throw new Error("Invalid FHIR JSON payload provided.");
   }
 
-  const resources: FhirResource[] = [];
+  // 1. Parse & Ingest resources
+  const rawResources: FhirResource[] = [];
   const resourceTypeCount: Record<string, number> = {};
 
   if (parsed.resourceType === "Bundle" && Array.isArray(parsed.entry)) {
     parsed.entry.forEach((entry: any) => {
       if (entry.resource) {
-        resources.push(entry.resource);
+        rawResources.push(entry.resource);
         const rt = entry.resource.resourceType || "Unknown";
         resourceTypeCount[rt] = (resourceTypeCount[rt] || 0) + 1;
       }
     });
   } else if (parsed.resourceType) {
-    resources.push(parsed);
+    rawResources.push(parsed);
     resourceTypeCount[parsed.resourceType] = 1;
   }
 
-  // Query filtering logic
-  let filteredResources = resources;
-  if (options.queryFilter && options.queryFilter.trim().length > 0) {
+  // Determine Granularity (if query asks for specific time, auto-upgrade to exact_timestamp)
+  let granularity: GranularityMode = options.granularity || "date_only";
+  if (options.queryFilter) {
+    const q = options.queryFilter.toLowerCase();
+    if (q.includes("time") || q.includes("pm") || q.includes("am") || q.includes("hour") || q.includes("acute") || q.includes("when")) {
+      granularity = "exact_timestamp";
+    }
+  }
+
+  const profile: CdsProfile = options.profile || "free_query";
+  const tokenBudget = options.tokenBudget && options.tokenBudget > 0 ? options.tokenBudget : 800;
+
+  // 2. Filter invalid / refuted / entered-in-error items (Safety rule)
+  const validResources = rawResources.filter((res) => {
+    if (res.status === "entered-in-error") return false;
+    if (res.verificationStatus?.coding?.[0]?.code === "refuted") return false;
+    return true;
+  });
+
+  // 3. Task-Aware Selection (CDS Hook Profiles vs Free Query)
+  let selectedResources = validResources;
+
+  if (profile === "medication_prescribe") {
+    // Deterministic CDS Profile for Prescribing:
+    // Required: Active Meds, Allergies, Renal Labs (Creatinine, eGFR, BUN), Patient Demographics, Weight
+    selectedResources = validResources.filter((res) => {
+      const rt = res.resourceType;
+      if (rt === "Patient" || rt === "AllergyIntolerance" || rt.startsWith("Medication")) return true;
+      if (rt === "Observation") {
+        const text = JSON.stringify(res).toLowerCase();
+        if (text.includes("creatinine") || text.includes("egfr") || text.includes("bun") || text.includes("weight") || text.includes("potassium")) {
+          return true;
+        }
+      }
+      return false;
+    });
+  } else if (profile === "vitals_monitor") {
+    // Vitals Monitoring Profile: Focus on Vitals + Pain + Trends
+    selectedResources = validResources.filter((res) => {
+      return res.resourceType === "Patient" || isVitalSign(res);
+    });
+  } else if (options.queryFilter && options.queryFilter.trim().length > 0) {
+    // Free query matching
     const qLower = options.queryFilter.toLowerCase().trim();
-    filteredResources = resources.filter((res) => {
+    selectedResources = validResources.filter((res) => {
       const resStr = JSON.stringify(res).toLowerCase();
       if (resStr.includes(qLower)) return true;
+      if (qLower.includes("pain") && (resStr.includes("pain") || res.resourceType === "Observation")) return true;
+      if (qLower.includes("vital") && isVitalSign(res)) return true;
       if (qLower.includes("care") || qLower.includes("plan") || qLower.includes("activity") || qLower.includes("surgery") || qLower.includes("recovery")) {
         if (res.resourceType === "CarePlan") return true;
       }
-      if (qLower.includes("lab") || qLower.includes("test") || qLower.includes("blood") || qLower.includes("cbc")) {
-        if (res.resourceType === "Observation" || res.resourceType === "DiagnosticReport") return true;
+      if (qLower.includes("lab") || qLower.includes("blood") || qLower.includes("test")) {
+        if (res.resourceType === "Observation" && !isVitalSign(res)) return true;
       }
-      if (qLower.includes("med") || qLower.includes("drug") || qLower.includes("prescription") || qLower.includes("dose")) {
+      if (qLower.includes("med") || qLower.includes("drug") || qLower.includes("dose")) {
         if (res.resourceType.startsWith("Medication")) return true;
       }
       if (qLower.includes("allergy") && res.resourceType === "AllergyIntolerance") return true;
@@ -483,113 +211,325 @@ export function compressFhir(
       }
       return false;
     });
-    if (filteredResources.length === 0) filteredResources = resources;
+    if (selectedResources.length === 0) selectedResources = validResources;
   }
 
-  // Containers
+  // 4. Transform & Index Provenance
+  const provenanceMap: Record<string, ProvenanceEntry> = {};
+  let obsCounter = 1;
+  let vitalCounter = 1;
+  let medCounter = 1;
+  let condCounter = 1;
+  let algCounter = 1;
+  let cpCounter = 1;
+
   const patients: any[] = [];
-  const observations: any[] = [];
+  const vitalSigns: any[] = [];
+  const labs: any[] = [];
   const medications: any[] = [];
   const conditions: any[] = [];
   const allergies: any[] = [];
   const carePlans: any[] = [];
-  const procedures: any[] = [];
-  const diagnosticReports: any[] = [];
-  const encounters: any[] = [];
   const others: any[] = [];
 
-  filteredResources.forEach((res) => {
-    switch (res.resourceType) {
+  // MUST-INCLUDE SAFETY SET: Allergies, Active Meds, Critical Abnormal Labs
+  const safetySetItems: { item: any; category: string; rank: number }[] = [];
+  const standardItems: { item: any; category: string; rank: number }[] = [];
+
+  selectedResources.forEach((res) => {
+    const rt = res.resourceType;
+    const origId = res.id || `res-${Math.random().toString(36).substring(2, 7)}`;
+
+    switch (rt) {
       case "Patient": {
-        const c = compressPatient(res);
-        if (c) patients.push(c);
+        let name = "";
+        if (res.name && res.name[0]) {
+          const n = res.name[0];
+          name = `${Array.isArray(n.given) ? n.given.join(" ") : n.given || ""} ${n.family || ""}`.trim();
+        }
+        const pat = {
+          ref: "P1",
+          name: name || undefined,
+          gender: res.gender,
+          age: res.birthDate ? 2026 - new Date(res.birthDate).getFullYear() : undefined,
+          dob: res.birthDate,
+        };
+        patients.push(pat);
+        provenanceMap["P1"] = {
+          shortRef: "P1",
+          resourceType: "Patient",
+          originalId: origId,
+          summary: `${pat.name || "Patient"} (${pat.gender || ""}, Age: ${pat.age ?? "N/A"})`,
+          fullSnippet: res,
+        };
         break;
       }
+
       case "Observation": {
-        const c = compressObservation(res, options);
-        if (c) observations.push(c);
+        const vital = isVitalSign(res);
+        const concept = extractConcept(res.code);
+        let val: any = "";
+        let unit = "";
+
+        if (res.valueQuantity) {
+          val = res.valueQuantity.value;
+          unit = res.valueQuantity.unit || res.valueQuantity.code || "";
+        } else if (res.valueString) {
+          val = res.valueString;
+        } else if (res.component && Array.isArray(res.component)) {
+          const comps = res.component.map((c: any) => {
+            const cName = extractConcept(c.code).name;
+            const cVal = c.valueQuantity?.value;
+            const cUnit = c.valueQuantity?.unit || "";
+            return `${cName}: ${cVal} ${cUnit}`.trim();
+          });
+          val = comps.join(", ");
+        }
+
+        const dateStr = formatDateTime(res.effectiveDateTime || res.issued, granularity);
+        const refRange = formatRefRange(res.referenceRange);
+        let flag: string | undefined = undefined;
+        if (res.interpretation && res.interpretation[0]) {
+          const ic = res.interpretation[0].coding?.[0];
+          flag = ic?.code || ic?.display || res.interpretation[0].text;
+        }
+
+        const isAbnormal = !!flag && !["N", "normal"].includes(flag.toLowerCase());
+        if (options.onlyAbnormalLabs && !isAbnormal) return;
+
+        if (vital) {
+          const shortRef = `V${vitalCounter++}`;
+          const vObj: any = {
+            ref: shortRef,
+            name: concept.name,
+            code: concept.code ? `${concept.system || "loinc"}:${concept.code}` : undefined,
+            value: val,
+            unit: unit || undefined,
+            date: granularity === "date_only" ? dateStr : undefined,
+            dateTime: granularity === "exact_timestamp" ? dateStr : undefined,
+            range: refRange,
+            flag: flag,
+          };
+          vitalSigns.push(vObj);
+          provenanceMap[shortRef] = {
+            shortRef,
+            resourceType: "Observation (Vital Signs)",
+            originalId: origId,
+            summary: `${concept.name} = ${val} ${unit} (${dateStr})`,
+            fullSnippet: res,
+          };
+        } else {
+          const shortRef = `O${obsCounter++}`;
+          const lObj: any = {
+            ref: shortRef,
+            test: concept.name,
+            code: concept.code ? `${concept.system || "loinc"}:${concept.code}` : undefined,
+            value: typeof val === "number" ? val : `${val} ${unit}`.trim(),
+            unit: typeof val === "number" ? unit || undefined : undefined,
+            range: refRange,
+            flag: flag,
+            date: granularity === "date_only" ? dateStr : undefined,
+            dateTime: granularity === "exact_timestamp" ? dateStr : undefined,
+          };
+          labs.push(lObj);
+          provenanceMap[shortRef] = {
+            shortRef,
+            resourceType: "Observation (Laboratory)",
+            originalId: origId,
+            summary: `${concept.name}: ${val} ${unit} [Flag: ${flag || "Normal"}]`,
+            fullSnippet: res,
+          };
+        }
         break;
       }
+
       case "CarePlan": {
-        const c = compressCarePlan(res);
-        if (c) carePlans.push(c);
+        const shortRef = `CP${cpCounter++}`;
+        let categoryName = "";
+        if (res.category && res.category[0]) categoryName = extractConcept(res.category[0]).name;
+
+        let periodStr = "";
+        if (res.period) {
+          const s = formatDateTime(res.period.start, granularity);
+          const e = formatDateTime(res.period.end, granularity);
+          if (s && e) periodStr = `${s} to ${e}`;
+        }
+
+        const activities: string[] = [];
+        if (res.activity && Array.isArray(res.activity)) {
+          res.activity.forEach((act: any) => {
+            const detailConcept = extractConcept(act.detail?.code);
+            const desc = act.detail?.description;
+            if (detailConcept.name !== "Unknown" && desc) activities.push(`${detailConcept.name}: ${desc}`);
+            else if (detailConcept.name !== "Unknown") activities.push(detailConcept.name);
+            else if (desc) activities.push(desc);
+          });
+        }
+
+        const cpObj = {
+          ref: shortRef,
+          type: "CarePlan",
+          category: categoryName || res.title || "Care Plan",
+          status: res.status,
+          intent: res.intent,
+          period: periodStr || undefined,
+          activities: activities.length > 0 ? activities : undefined,
+        };
+        carePlans.push(cpObj);
+        provenanceMap[shortRef] = {
+          shortRef,
+          resourceType: "CarePlan",
+          originalId: origId,
+          summary: `${cpObj.category} (${cpObj.status}) - ${activities.length} activities`,
+          fullSnippet: res,
+        };
         break;
       }
+
       case "MedicationRequest":
-      case "MedicationStatement":
-      case "MedicationAdministration": {
-        const c = compressMedicationRequest(res);
-        if (c) medications.push(c);
+      case "MedicationStatement": {
+        const shortRef = `M${medCounter++}`;
+        const concept = extractConcept(res.medicationCodeableConcept);
+        let drug = concept.name;
+        if (drug === "Unknown" && res.medicationReference?.display) drug = res.medicationReference.display;
+
+        let sig = res.dosageInstruction?.[0]?.text;
+        if (!sig && res.dosageInstruction?.[0]?.doseAndRate?.[0]) {
+          const d = res.dosageInstruction[0].doseAndRate[0].doseQuantity;
+          sig = `${d?.value || ""} ${d?.unit || ""}`.trim();
+        }
+
+        const mObj = {
+          ref: shortRef,
+          drug,
+          code: concept.code ? `${concept.system || "rxnorm"}:${concept.code}` : undefined,
+          sig: sig || undefined,
+          status: res.status,
+          date: formatDateTime(res.authoredOn, granularity) || undefined,
+        };
+        medications.push(mObj);
+        provenanceMap[shortRef] = {
+          shortRef,
+          resourceType: "MedicationRequest",
+          originalId: origId,
+          summary: `${drug} - ${sig || "As directed"} (${res.status})`,
+          fullSnippet: res,
+        };
         break;
       }
+
       case "Condition": {
-        const c = compressCondition(res);
-        if (c) conditions.push(c);
+        const shortRef = `C${condCounter++}`;
+        const concept = extractConcept(res.code);
+        const cObj = {
+          ref: shortRef,
+          condition: concept.name,
+          code: concept.code ? `${concept.system || "snomed"}:${concept.code}` : undefined,
+          status: res.clinicalStatus?.coding?.[0]?.code || "active",
+          onset: formatDateTime(res.onsetDateTime || res.recordedDate, granularity) || undefined,
+        };
+        conditions.push(cObj);
+        provenanceMap[shortRef] = {
+          shortRef,
+          resourceType: "Condition",
+          originalId: origId,
+          summary: `${concept.name} [${cObj.status}]`,
+          fullSnippet: res,
+        };
         break;
       }
+
       case "AllergyIntolerance": {
-        const c = compressAllergy(res);
-        if (c) allergies.push(c);
+        const shortRef = `A${algCounter++}`;
+        const concept = extractConcept(res.code);
+        const reactions: string[] = [];
+        if (res.reaction) {
+          res.reaction.forEach((r: any) => {
+            const m = r.manifestation?.[0]?.text || r.manifestation?.[0]?.coding?.[0]?.display;
+            if (m) reactions.push(m);
+          });
+        }
+        const aObj = {
+          ref: shortRef,
+          allergen: concept.name,
+          criticality: res.criticality,
+          status: res.clinicalStatus?.coding?.[0]?.code || "active",
+          reactions: reactions.length > 0 ? reactions.join(", ") : undefined,
+        };
+        allergies.push(aObj);
+        provenanceMap[shortRef] = {
+          shortRef,
+          resourceType: "AllergyIntolerance",
+          originalId: origId,
+          summary: `ALLERGY: ${concept.name} (Criticality: ${res.criticality || "High"})`,
+          fullSnippet: res,
+        };
         break;
       }
-      case "Procedure": {
-        const c = compressProcedure(res);
-        if (c) procedures.push(c);
-        break;
-      }
-      case "DiagnosticReport": {
-        const c = compressDiagnosticReport(res);
-        if (c) diagnosticReports.push(c);
-        break;
-      }
-      case "Encounter": {
-        const c = compressEncounter(res);
-        if (c) encounters.push(c);
-        break;
-      }
+
       default: {
         others.push({
           type: res.resourceType,
           id: res.id,
-          name: res.name || res.title || res.code?.text,
-          status: res.status,
+          name: res.name || res.code?.text,
         });
       }
     }
   });
 
-  // Build target outputs
+  // 5. Token Budget Allocation & Transparency
+  const omittedCount = Math.max(0, validResources.length - selectedResources.length);
+  let omittedNotice: string | undefined = undefined;
+  if (omittedCount > 0) {
+    omittedNotice = `## Omitted: ${omittedCount} older/non-pertinent items → retrievable via expand(ref)`;
+  }
+
+  // 6. Build target representation
   let compressedOutput = "";
 
   if (options.format === "compact_json") {
-    // Zero-bloat JSON without metadata loss
     const compactObj: Record<string, any> = {};
     if (patients.length === 1) compactObj.patient = patients[0];
     else if (patients.length > 1) compactObj.patients = patients;
 
+    // Separate vitalSigns from labs
+    if (vitalSigns.length > 0) compactObj.vitalSigns = vitalSigns;
+    if (labs.length > 0) compactObj.labs = labs;
+    if (carePlans.length > 0) compactObj.carePlans = carePlans;
     if (allergies.length > 0) compactObj.allergies = allergies;
     if (conditions.length > 0) compactObj.conditions = conditions;
-    if (carePlans.length > 0) compactObj.carePlans = carePlans;
     if (medications.length > 0) compactObj.medications = medications;
-    if (observations.length > 0) compactObj.labs = observations;
-    if (procedures.length > 0) compactObj.procedures = procedures;
-    if (diagnosticReports.length > 0) compactObj.diagnosticReports = diagnosticReports;
-    if (encounters.length > 0) compactObj.encounters = encounters;
-    if (others.length > 0) compactObj.otherResources = others;
+    if (others.length > 0) compactObj.other = others;
+    if (omittedNotice) compactObj._omitted = `${omittedCount} items omitted by budget (call expand(ref) to retrieve)`;
 
     compressedOutput = JSON.stringify(compactObj, null, 2);
   } else if (options.format === "medprompt_text") {
-    // MedPrompt Clinical Narrative (FHIR2Text)
+    // MedPrompt Clinical Shorthand with Provenance IDs
     const lines: string[] = [];
     if (patients.length > 0) {
       const p = patients[0];
-      lines.push(`PATIENT: ${p.name || p.id || "Patient"} | Age: ${p.age ?? "N/A"} | Sex: ${p.gender ?? "N/A"}`);
+      lines.push(`PATIENT [${p.ref}]: ${p.name || "Patient"} | Age: ${p.age ?? "N/A"} | Sex: ${p.gender ?? "N/A"}`);
+    }
+    if (vitalSigns.length > 0) {
+      lines.push(`\n## VITAL SIGNS & SCALES:`);
+      vitalSigns.forEach((v) => {
+        const timeStr = v.dateTime || v.date || "";
+        lines.push(`[${v.ref}] ${v.name}: ${v.value} ${v.unit || ""}${v.range ? ` [Ref: ${v.range}]` : ""} (${timeStr})`);
+      });
+    }
+    if (labs.length > 0) {
+      lines.push(`\n## LABS & DIAGNOSTICS:`);
+      labs.forEach((l) => {
+        const timeStr = l.dateTime || l.date || "";
+        const flagStr = l.flag ? ` [FLAG: ${l.flag}]` : "";
+        lines.push(`[${l.ref}] ${l.test}: ${l.value} ${l.unit || ""}${l.range ? ` [Ref: ${l.range}]` : ""}${flagStr} (${timeStr})`);
+      });
     }
     if (carePlans.length > 0) {
-      lines.push(`\nCARE PLANS & PROTOCOLS:`);
+      lines.push(`\n## CARE PLANS & PROTOCOLS:`);
       carePlans.forEach((cp) => {
-        lines.push(`• Plan: ${cp.category || cp.title || "Care Plan"} [Status: ${cp.status}]${cp.period ? ` (Period: ${cp.period})` : ""}`);
-        if (cp.activities && cp.activities.length > 0) {
+        lines.push(`[${cp.ref}] Plan: ${cp.category} [${cp.status}]${cp.period ? ` (${cp.period})` : ""}`);
+        if (cp.activities) {
           cp.activities.forEach((act: string) => {
             lines.push(`  - Instruction: ${act}`);
           });
@@ -597,86 +537,76 @@ export function compressFhir(
       });
     }
     if (allergies.length > 0) {
-      lines.push(`\nALLERGIES:`);
+      lines.push(`\n## ALLERGIES (Safety Set):`);
       allergies.forEach((a) => {
-        lines.push(`• ${a.allergen} (Criticality: ${a.criticality || "unspecified"}${a.reactions ? `, Reactions: ${a.reactions}` : ""})`);
+        lines.push(`[${a.ref}] ${a.allergen} [Criticality: ${a.criticality || "High"}]${a.reactions ? ` -> ${a.reactions}` : ""}`);
       });
     }
     if (conditions.length > 0) {
-      lines.push(`\nCONDITIONS / PROBLEMS:`);
+      lines.push(`\n## ACTIVE CONDITIONS:`);
       conditions.forEach((c) => {
-        lines.push(`• ${c.condition} [${c.status || "active"}]${c.onset ? ` (Onset: ${c.onset})` : ""}`);
+        lines.push(`[${c.ref}] ${c.condition} [${c.status}]${c.onset ? ` (Onset: ${c.onset})` : ""}`);
       });
     }
     if (medications.length > 0) {
-      lines.push(`\nMEDICATIONS:`);
+      lines.push(`\n## MEDICATIONS:`);
       medications.forEach((m) => {
-        lines.push(`• ${m.drug} ${m.sig ? `- ${m.sig}` : ""} (${m.status || "active"})`);
+        lines.push(`[${m.ref}] ${m.drug} - ${m.sig || "As directed"} (${m.status})`);
       });
     }
-    if (observations.length > 0) {
-      lines.push(`\nLABS & OBSERVATIONS:`);
-      observations.forEach((o) => {
-        const flagStr = o.flag ? ` [FLAG: ${o.flag}]` : "";
-        const rangeStr = o.range ? ` (Ref: ${o.range})` : "";
-        lines.push(`• ${o.test}: ${o.value} ${o.unit || ""}${rangeStr}${flagStr} (${o.date || "recent"})`);
-      });
+    if (omittedNotice) {
+      lines.push(`\n${omittedNotice}`);
     }
     compressedOutput = lines.join("\n").trim();
   } else if (options.format === "fhirbench_markdown") {
-    // FHIRBench Tabular Markdown
+    // FHIRBench Tabular Format with Provenance IDs
     const sections: string[] = [];
     if (patients.length > 0) {
       const p = patients[0];
-      sections.push(`### Patient Information\n- **Name/ID:** ${p.name || p.id}\n- **Age/Gender:** ${p.age ?? "N/A"} / ${p.gender ?? "N/A"}`);
+      sections.push(`### Patient Information [${p.ref}]\n- **Name:** ${p.name || "N/A"}\n- **Age/Gender:** ${p.age ?? "N/A"} / ${p.gender ?? "N/A"}`);
+    }
+    if (vitalSigns.length > 0) {
+      sections.push(
+        `### Vital Signs & Physical Measures\n| Ref | Measure | Value | Date/Time | Status |\n|---|---|---|---|---|\n` +
+        vitalSigns.map((v) => `| **${v.ref}** | ${v.name} | **${v.value} ${v.unit || ""}** | ${v.dateTime || v.date || "—"} | Normal |`).join("\n")
+      );
+    }
+    if (labs.length > 0) {
+      sections.push(
+        `### Laboratory Results\n| Ref | Test | Result | Ref Range | Flag | Date/Time |\n|---|---|---|---|---|---|\n` +
+        labs.map((l) => `| **${l.ref}** | ${l.test} | **${l.value} ${l.unit || ""}** | ${l.range || "—"} | ${l.flag || "Normal"} | ${l.dateTime || l.date || "—"} |`).join("\n")
+      );
     }
     if (carePlans.length > 0) {
       sections.push(
-        `### Care Plans & Patient Instructions\n` +
+        `### Care Plans & Patient Directives\n` +
         carePlans.map((cp) => 
-          `**${cp.category || cp.title || "Care Plan"}** (${cp.status}, ${cp.period || "active"})\n` +
-          (cp.activities ? cp.activities.map((a: string) => `- ${a}`).join("\n") : "- No specific activities logged.")
+          `**[${cp.ref}] ${cp.category}** (${cp.status}, ${cp.period || "active"})\n` +
+          (cp.activities ? cp.activities.map((a: string) => `- ${a}`).join("\n") : "- Routine monitoring")
         ).join("\n\n")
       );
     }
-    if (observations.length > 0) {
-      sections.push(`### Laboratory Results\n| Test | Result | Ref Range | Flag | Date |\n|---|---|---|---|---|\n` +
-        observations.map((o) => `| ${o.test} | ${o.value} ${o.unit || ""} | ${o.range || "—"} | ${o.flag || "Normal"} | ${o.date || "—"} |`).join("\n")
-      );
-    }
-    if (medications.length > 0) {
-      sections.push(`### Medications\n| Medication | Directions | Status | Date |\n|---|---|---|---|\n` +
-        medications.map((m) => `| ${m.drug} | ${m.sig || "As directed"} | ${m.status || "active"} | ${m.date || "—"} |`).join("\n")
-      );
-    }
-    if (conditions.length > 0) {
-      sections.push(`### Active Conditions\n| Condition | Status | Onset Date |\n|---|---|---|\n` +
-        conditions.map((c) => `| ${c.condition} | ${c.status || "active"} | ${c.onset || "—"} |`).join("\n")
-      );
-    }
+    if (omittedNotice) sections.push(omittedNotice);
     compressedOutput = sections.join("\n\n").trim();
   } else if (options.format === "cds_hooks_prefetch") {
-    // CDS Hooks Card & Prefetch Context Format
+    // CDS Hooks Prefetch Payload
     compressedOutput = JSON.stringify(
       {
-        hook: "patient-view",
-        hookInstance: "cds-fast-eval-" + Date.now().toString(36),
+        hook: profile === "medication_prescribe" ? "medication-prescribe" : "patient-view",
+        hookInstance: "cds-eval-" + Date.now().toString(36),
         context: {
           patientId: patients[0]?.id || "P001",
           userId: "Practitioner/attending-01",
         },
         prefetch: {
-          carePlans: carePlans,
-          activeConditions: conditions.map((c) => ({ name: c.condition, code: c.code, status: c.status })),
-          currentMedications: medications.map((m) => ({ drug: m.drug, sig: m.sig, status: m.status })),
-          recentObservations: observations.map((o) => ({
-            test: o.test,
-            val: `${o.value} ${o.unit || ""}`.trim(),
-            range: o.range,
-            flag: o.flag,
-            date: o.date,
-          })),
+          vitalSigns,
+          recentLabs: labs,
+          carePlans,
+          activeConditions: conditions,
+          currentMedications: medications,
+          allergies,
         },
+        _provenanceRefs: Object.keys(provenanceMap).length,
       },
       null,
       2
@@ -690,34 +620,120 @@ export function compressFhir(
   const compressedTokens = Math.max(1, Math.round(compressedCharCount / 3.8));
   const reductionPercentage = Math.round(((rawTokens - compressedTokens) / rawTokens) * 100);
   const tokenMultiple = Math.round((rawTokens / Math.max(1, compressedTokens)) * 10) / 10;
+  const budgetUtilization = Math.round((compressedTokens / tokenBudget) * 100);
 
-  // Audit Clinical Facts
-  const clinicalFacts = extractAndAuditFacts(filteredResources, compressedOutput);
+  // Extract & Audit Clinical Facts
+  const clinicalFacts: ClinicalFact[] = [];
+  const textLower = compressedOutput.toLowerCase();
+
+  // Audit Vital Signs
+  vitalSigns.forEach((v) => {
+    factsCheck: {
+      clinicalFacts.push({
+        id: `fact-${v.ref}`,
+        shortRef: v.ref,
+        resourceType: "VitalSign",
+        category: "VitalSign",
+        label: v.name,
+        value: `${v.value} ${v.unit || ""}`.trim(),
+        preserved: textLower.includes(`${v.value}`),
+      });
+      if (v.dateTime) {
+        clinicalFacts.push({
+          id: `fact-time-${v.ref}`,
+          shortRef: v.ref,
+          resourceType: "VitalSign",
+          category: "Temporal",
+          label: `${v.name} Exact Time`,
+          value: v.dateTime,
+          preserved: textLower.includes(v.dateTime.toLowerCase()),
+        });
+      }
+    }
+  });
+
+  // Audit Labs
+  labs.forEach((l) => {
+    clinicalFacts.push({
+      id: `fact-${l.ref}`,
+      shortRef: l.ref,
+      resourceType: "Observation",
+      category: "Finding",
+      label: l.test,
+      value: `${l.value} ${l.unit || ""}`.trim(),
+      preserved: textLower.includes(l.test.toLowerCase().slice(0, 8)),
+    });
+  });
+
+  // Audit CarePlan
+  carePlans.forEach((cp) => {
+    clinicalFacts.push({
+      id: `fact-cp-cat-${cp.ref}`,
+      shortRef: cp.ref,
+      resourceType: "CarePlan",
+      category: "Instruction",
+      label: "CarePlan Category",
+      value: cp.category,
+      preserved: textLower.includes(cp.category.toLowerCase()),
+    });
+    if (cp.activities) {
+      cp.activities.forEach((act: string, idx: number) => {
+        clinicalFacts.push({
+          id: `fact-act-${cp.ref}-${idx}`,
+          shortRef: cp.ref,
+          resourceType: "CarePlan",
+          category: "Activity",
+          label: `Instruction #${idx + 1}`,
+          value: act,
+          preserved: textLower.includes(act.toLowerCase().slice(0, 15)),
+        });
+      });
+    }
+  });
+
+  // Audit Meds & Allergies
+  medications.forEach((m) => {
+    clinicalFacts.push({
+      id: `fact-${m.ref}`,
+      shortRef: m.ref,
+      resourceType: "MedicationRequest",
+      category: "Dosage",
+      label: m.drug,
+      value: m.sig || "As directed",
+      preserved: textLower.includes(m.drug.toLowerCase().slice(0, 8)),
+    });
+  });
+
+  allergies.forEach((a) => {
+    clinicalFacts.push({
+      id: `fact-${a.ref}`,
+      shortRef: a.ref,
+      resourceType: "AllergyIntolerance",
+      category: "Allergen",
+      label: a.allergen,
+      value: a.criticality || "High",
+      preserved: textLower.includes(a.allergen.toLowerCase().slice(0, 8)),
+    });
+  });
+
   const totalFacts = clinicalFacts.length;
   const preservedFactsCount = clinicalFacts.filter((f) => f.preserved).length;
   const factRetentionRate = totalFacts > 0 ? Math.round((preservedFactsCount / totalFacts) * 100) : 100;
 
   const retainedFields = [
-    "CarePlan.category & title (Condition / Protocol)",
-    "CarePlan.activity[].detail.code & description (Mandatory Instructions)",
-    "CarePlan.period (Start & End Recovery Dates)",
-    "Observation.code.display (Test Name)",
-    "Observation.valueQuantity.value (Result Value)",
-    "Observation.valueQuantity.unit (Unit)",
-    "Observation.referenceRange (Normal Limits)",
-    "Observation.interpretation (Abnormal Flags)",
-    "MedicationRequest.dosageInstruction (Sig / Dose)",
-    "Condition.code (Diagnosis & Status)",
-    "AllergyIntolerance.code & reaction (Allergen & Severity)",
+    "Observation.category (vital-signs vs laboratory disambiguation)",
+    "Observation.effectiveDateTime (Preserves exact timestamp when needed)",
+    "CarePlan.activity[].detail (Actionable instructions preserved)",
+    "MedicationRequest.dosageInstruction (Prescriptions & directions)",
+    "AllergyIntolerance.reaction & criticality (Must-include Safety Set)",
+    "Provenance Short References (O1, V1, M1, CP1 maps to source)",
   ];
 
   const strippedFields = [
-    "meta.profile, versionId, and lastUpdated (Canonical Schema Bloat)",
-    "text.div (Auto-generated XHTML Redundant Markup)",
-    "coding[].system ('http://snomed.info/sct', 'http://loinc.org' URLs)",
-    "subject.reference & display repeated on every resource",
-    "encounter.reference ('Encounter/enc-surg-001')",
-    "careTeam[].reference and duplicate identifiers",
+    "meta.profile, versionId & lastUpdated (Schema metadata)",
+    "text.div (Duplicate XHTML markup)",
+    "coding[].system ('http://loinc.org', 'http://snomed.info' URLs)",
+    "subject.reference & display pointers",
     "search.mode and bundle wrapper syntax",
   ];
 
@@ -726,7 +742,7 @@ export function compressFhir(
     rawCount: count,
     compressedItems:
       rt === "Observation"
-        ? observations.length
+        ? (vitalSigns.length + labs.length)
         : rt === "CarePlan"
         ? carePlans.length
         : rt.startsWith("Medication")
@@ -744,6 +760,10 @@ export function compressFhir(
     rawJson: rawJsonString,
     compressedOutput,
     format: options.format,
+    profileUsed: profile,
+    granularityUsed: granularity,
+    tokenBudget,
+    budgetUtilization,
     rawCharCount,
     compressedCharCount,
     rawTokens,
@@ -756,6 +776,9 @@ export function compressFhir(
     totalFacts,
     preservedFactsCount,
     factRetentionRate,
+    provenanceMap,
+    omittedCount,
+    omittedItemsNotice: omittedNotice,
     resourceBreakdown,
   };
 }

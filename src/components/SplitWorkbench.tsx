@@ -10,14 +10,16 @@ import {
   RefreshCw,
   Search,
   Zap,
-  DollarSign,
   TrendingDown,
   Play,
   Clock,
   CheckCircle2,
   AlertCircle,
+  Sliders,
+  Calendar,
 } from "lucide-react";
-import { CompressionFormat, CompressionResult } from "../types/fhir.ts";
+import { CompressionFormat, CompressionResult, GranularityMode, CdsProfile } from "../types/fhir.ts";
+import { ProvenanceDrawer } from "./ProvenanceDrawer.tsx";
 
 interface SplitWorkbenchProps {
   rawJsonText: string;
@@ -27,9 +29,15 @@ interface SplitWorkbenchProps {
   setFormat: (f: CompressionFormat) => void;
   queryFilter: string;
   setQueryFilter: (q: string) => void;
+  granularity: GranularityMode;
+  setGranularity: (g: GranularityMode) => void;
+  profile: CdsProfile;
+  setProfile: (p: CdsProfile) => void;
+  tokenBudget: number;
+  setTokenBudget: (b: number) => void;
   onlyAbnormal: boolean;
   setOnlyAbnormal: (b: boolean) => void;
-  onSelectSample: (sampleKey: "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom") => void;
+  onSelectSample: (sampleKey: "pain" | "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom") => void;
   selectedSample: string;
 }
 
@@ -41,6 +49,12 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
   setFormat,
   queryFilter,
   setQueryFilter,
+  granularity,
+  setGranularity,
+  profile,
+  setProfile,
+  tokenBudget,
+  setTokenBudget,
   onlyAbnormal,
   setOnlyAbnormal,
   onSelectSample,
@@ -76,7 +90,6 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
     reader.onload = (event) => {
       const text = event.target?.result as string;
       try {
-        // validate JSON
         const parsed = JSON.parse(text);
         setRawJsonText(JSON.stringify(parsed, null, 2));
         onSelectSample("custom");
@@ -91,7 +104,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
     setTestingLlm(true);
     setLlmError(null);
     try {
-      const query = queryFilter || "Summarize the critical clinical findings, medications, and any abnormal lab tests.";
+      const query = queryFilter || "What was the patient's pain severity and clinical status?";
       const res = await fetch("/api/evaluate-llm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,8 +136,18 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           {/* Preset Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-gray-700 dark:text-gray-300 mr-1">
-              Select Preset Bundle:
+              Select Preset Payload:
             </span>
+            <button
+              onClick={() => onSelectSample("pain")}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-colors ${
+                selectedSample === "pain"
+                  ? "bg-blue-500/10 border-blue-500/40 text-blue-700 dark:text-blue-300 font-bold"
+                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+              }`}
+            >
+              ⭐ Pain Severity Vital (Score 2 • LOINC 72514-3)
+            </button>
             <button
               onClick={() => onSelectSample("careplan")}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-colors ${
@@ -133,7 +156,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
-              ⭐ CarePlan (User's Example • 593 → 82 Tok)
+              CarePlan Post-Op (Activities Intact)
             </button>
             <button
               onClick={() => onSelectSample("hemoglobin")}
@@ -143,7 +166,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
-              Hemoglobin (1 Obs • 248 → 27 Tok)
+              Hemoglobin Lab (1 Obs)
             </button>
             <button
               onClick={() => onSelectSample("20_labs")}
@@ -153,7 +176,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
               }`}
             >
-              20-Lab Panel (4,200 → 280 Tok)
+              20-Lab Panel (4,200 Tok)
             </button>
             <button
               onClick={() => onSelectSample("full_cds")}
@@ -186,32 +209,112 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           {/* Target Format */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-              LLM Target Format:
+              Format:
             </span>
             <select
               value={format}
               onChange={(e) => setFormat(e.target.value as CompressionFormat)}
               className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
-              <option value="compact_json">Compact Clinical JSON (RTK / AI Agents)</option>
-              <option value="medprompt_text">MedPrompt Clinical Shorthand (FHIR2Text)</option>
+              <option value="compact_json">Compact Clinical JSON (vitalSigns vs labs)</option>
+              <option value="medprompt_text">MedPrompt Text (FHIR2Text Shorthand)</option>
               <option value="fhirbench_markdown">FHIRBench Flat Markdown Tables</option>
               <option value="cds_hooks_prefetch">CDS Hooks Prefetch Context</option>
             </select>
           </div>
         </div>
 
-        {/* Query & Filter Bar */}
+        {/* Task-Aware Optimizer Controls: Granularity, CDS Profiles, Token Budget */}
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          {/* 1. CDS Profile Selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+              CDS Intent Profile:
+            </label>
+            <select
+              value={profile}
+              onChange={(e) => setProfile(e.target.value as CdsProfile)}
+              className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:outline-none"
+            >
+              <option value="free_query">Agent / Free-Form Query</option>
+              <option value="medication_prescribe">medication-prescribe (Deterministic CDS)</option>
+              <option value="vitals_monitor">vitals_monitor (Pain, BP, Acute)</option>
+              <option value="patient_view">patient_view (Inpatient Snapshot)</option>
+            </select>
+          </div>
+
+          {/* 2. Granularity Selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+              Temporal Granularity:
+            </label>
+            <div className="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg">
+              <button
+                onClick={() => setGranularity("exact_timestamp")}
+                className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
+                  granularity === "exact_timestamp"
+                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-2xs font-bold"
+                    : "text-gray-600 dark:text-gray-400"
+                }`}
+              >
+                Exact Timestamp
+              </button>
+              <button
+                onClick={() => setGranularity("date_only")}
+                className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
+                  granularity === "date_only"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-2xs font-bold"
+                    : "text-gray-600 dark:text-gray-400"
+                }`}
+              >
+                Date Only
+              </button>
+            </div>
+          </div>
+
+          {/* 3. Token Budget Slider */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1 flex justify-between">
+              <span>Token Budget:</span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{tokenBudget} tok max</span>
+            </label>
+            <div className="flex items-center gap-1.5">
+              {[250, 500, 800, 1500].map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setTokenBudget(b)}
+                  className={`flex-1 py-1 rounded border text-[11px] font-mono transition-colors ${
+                    tokenBudget === b
+                      ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold"
+                      : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Safety Set Status */}
+          <div className="flex flex-col justify-end">
+            <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span><strong>Safety-Set:</strong> Allergies, Meds, Outliers Never Dropped</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Free Query Input */}
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="w-full sm:w-auto flex-1 flex items-center gap-2">
-            <div className="relative w-full max-w-md">
+            <div className="relative w-full max-w-lg">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={queryFilter}
                 onChange={(e) => setQueryFilter(e.target.value)}
-                placeholder="Query / CDS Intent Filter (e.g. 'Hemoglobin', 'Blood Pressure', 'Renal')"
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                placeholder="Query / Task Intent (e.g. 'What was the patient\'s pain score?', 'Pain score at 6:21 PM')"
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
               />
             </div>
             {queryFilter && (
@@ -231,7 +334,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
               onChange={(e) => setOnlyAbnormal(e.target.checked)}
               className="rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-gray-700"
             />
-            <span>Filter Only Abnormal Labs (Outliers)</span>
+            <span>Filter Only Abnormal Results</span>
           </label>
         </div>
       </div>
@@ -251,7 +354,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                   INPUT: Raw FHIR Bundle
                 </h3>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                  EHR / SMART on FHIR Payload (Verbose)
+                  Canonical EHR Source of Truth
                 </p>
               </div>
             </div>
@@ -337,6 +440,14 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                 {result.preservedFactsCount}/{result.totalFacts} ({result.factRetentionRate}%)
               </span>
             </div>
+
+            {/* Budget status */}
+            <div className="mt-1.5 w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-[10px] text-gray-600 dark:text-gray-400 font-sans flex items-center justify-between">
+              <span>Budget Usage:</span>
+              <span className="font-bold font-mono text-gray-900 dark:text-white">
+                {result.compressedTokens}/{tokenBudget} ({result.budgetUtilization}%)
+              </span>
+            </div>
           </div>
         </div>
 
@@ -350,10 +461,10 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
               </div>
               <div>
                 <h3 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                  OUTPUT: Optimized for LLM
+                  OUTPUT: Optimized Clinical Context
                 </h3>
                 <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
-                  Zero-Bloat Clinical Context for AI Agent Prompt
+                  Categorized Vitals vs Labs • Provenance Short IDs (V1, O1)
                 </p>
               </div>
             </div>
@@ -368,7 +479,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
 
           {/* Sub-bar stats & actions */}
           <div className="px-3.5 py-1.5 bg-gray-50 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800/60 flex items-center justify-between text-[11px] text-gray-500">
-            <span className="font-mono">Format: {format}</span>
+            <span className="font-mono">Granularity: {granularity}</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCopyPrompt}
@@ -397,7 +508,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           {/* Quick LLM Test Trigger Bar */}
           <div className="p-3 bg-gray-50 dark:bg-gray-800/40 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
             <span className="text-[11px] text-gray-500 dark:text-gray-400">
-              Check answer quality on Gemini 3.8 Flash:
+              Verify accuracy on Gemini 3.8 Flash:
             </span>
             <button
               onClick={runQuickLlmTest}
@@ -450,6 +561,13 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           <span>{llmError}</span>
         </div>
       )}
+
+      {/* Provenance Map Drawer */}
+      <ProvenanceDrawer
+        provenanceMap={result.provenanceMap}
+        omittedCount={result.omittedCount}
+        omittedNotice={result.omittedItemsNotice}
+      />
     </div>
   );
 };

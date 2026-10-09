@@ -1,7 +1,50 @@
 /**
  * Realistic FHIR R4 Test Payloads
- * Includes user's exact Hemoglobin example, Minor Surgery CarePlan with clinical activities, 20-Lab Panel, and Full Inpatient CDS Bundle.
+ * Includes user's exact Pain Severity Observation, Minor Surgery CarePlan, Hemoglobin, 20-Lab Panel, and Full Inpatient CDS Bundle.
  */
+
+// Vital Signs: Pain Severity Observation (User's Exact Example - LOINC 72514-3)
+export const SAMPLE_PAIN_SEVERITY = {
+  resourceType: "Observation",
+  id: "obs-pain-001",
+  status: "final",
+  category: [
+    {
+      coding: [
+        {
+          system: "http://terminology.hl7.org/CodeSystem/observation-category",
+          code: "vital-signs",
+          display: "Vital Signs"
+        }
+      ]
+    }
+  ],
+  code: {
+    coding: [
+      {
+        system: "http://loinc.org",
+        code: "72514-3",
+        display: "Pain severity - 0-10 verbal numeric rating [Score] - Reported"
+      }
+    ],
+    text: "Pain severity"
+  },
+  subject: {
+    reference: "Patient/736a-patient-001",
+    display: "Rajesh Kumar Sharma"
+  },
+  encounter: {
+    reference: "Encounter/4448-enc-001"
+  },
+  effectiveDateTime: "2015-06-05T18:21:10-04:00",
+  issued: "2015-06-05T18:21:10.046-04:00",
+  valueQuantity: {
+    value: 2,
+    unit: "{score}",
+    system: "http://unitsofmeasure.org",
+    code: "{score}"
+  }
+};
 
 // Post-Operative CarePlan with Clinical Instructions (User's Exact Example)
 export const SAMPLE_CAREPLAN_SURGERY = {
