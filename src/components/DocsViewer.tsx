@@ -130,12 +130,55 @@ This repository is configured out-of-the-box for **Vercel Services** using the r
 }
 \`\`\`
 
-### Vercel Deployment Steps:
+### 1-Click Vite Deployment (Recommended):
+The app runs completely in the browser with WebAssembly and client-side TypeScript.
+
+\`\`\`json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+\`\`\`
+
 1. Connect GitHub repository (namanscanbotesting/fhiroptimizer).
-2. Choose 'Services' mode when prompted.
-3. Vercel automatically maps 'app' to the Vite React frontend and 'namanfhirfold' to the Python optimizer.
-4. The binding NAMANFHIRFOLD_URL connects the services privately.
-5. Add GEMINI_API_KEY in Vercel Environment Variables for real-time CDS reasoning.
+2. Select **Standalone / Vite** preset.
+3. Build Command: \`npm run build\`, Output: \`dist\`.
+4. Click Deploy — Live in under 30 seconds!
+
+### Multi-Service Vercel Setup (Optional Frontend + Python Backend):
+If running both Vite and Python microservice together on Vercel:
+\`\`\`json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "vite"
+    },
+    "namanfhirfold": {
+      "root": "python/namanfhirfold",
+      "runtime": "python",
+      "entrypoint": "index.py"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}
+\`\`\`
 
 ## 2. Docker / Cloud Run / Kubernetes
 - Docker: Full-stack node:20-alpine runner with Vite static bundle + API routes.

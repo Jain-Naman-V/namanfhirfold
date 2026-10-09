@@ -175,13 +175,51 @@ EXPOSE 3000
 CMD ["tsx", "server.ts"]
 ```
 
-### Vercel Multi-Service Deployment (Frontend + Python Service)
+### Vercel Deployment (Vite Web App - 1-Click Recommended)
 
-This repository includes a native `vercel.json` configured for **Vercel Services** (monorepo multi-service architecture):
+The web application is a high-performance React + Vite Single Page Application (SPA). All clinical compression, decompression, tabular analysis, and tree explorer operations run directly in the browser via client-side WebAssembly / TypeScript algorithms.
 
-- **Service 1 (`app`)**: Vite React frontend + TypeScript serverless functions at root `.`.
-- **Service 2 (`namanfhirfold`)**: Zero-dependency Python clinical optimizer service in `python/namanfhirfold`.
-- **Binding**: `NAMANFHIRFOLD_URL` is automatically injected into `app` so TypeScript functions call the Python service internally without exposing it publicly.
+This means you can deploy the repository directly to Vercel as a pure Vite project with **zero backend configuration** or complex multi-service setups!
+
+#### `vercel.json` (Included in Root):
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+#### Step-by-Step Vercel Deployment (Only 1 Minute):
+1. **Push your code to GitHub**:
+   ```bash
+   git add .
+   git commit -m "Configure direct Vite deployment for Vercel"
+   git push origin main
+   ```
+2. **Go to [Vercel Dashboard](https://vercel.com/new)** and click **"Add New... -> Project"**.
+3. **Select `namanscanbotesting/fhiroptimizer`** from your repository list.
+4. **Vercel Settings**:
+   - **Framework Preset**: `Vite` (automatically detected)
+   - **Root Directory**: `./` (leave default)
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+   - *(If Vercel asks between Standalone or Services, choose **Standalone / Vite**)*
+5. Click **"Deploy"**!
+   Your site will build in ~20 seconds and be live at `https://fhiroptimizer.vercel.app` (or your custom domain).
+
+---
+
+### Alternative: Vercel Multi-Service Setup (Vite + Python Lambda Service)
+
+If you specifically wish to also host the `python/namanfhirfold` package as an internal Vercel Python serverless microservice alongside the Vite frontend, you can use the multi-service format:
 
 ```json
 {
@@ -215,13 +253,6 @@ This repository includes a native `vercel.json` configured for **Vercel Services
   ]
 }
 ```
-
-#### How to Deploy on Vercel:
-1. Push this commit to your GitHub repository (`namanscanbotesting/fhiroptimizer`).
-2. In Vercel, import your project. Vercel will detect `vercel.json` automatically.
-3. Select **Services** mode.
-4. Set the optional environment variable `GEMINI_API_KEY` in Project Settings.
-5. Click **Deploy**. Vercel will build both services in parallel and configure internal service discovery!
 
 ---
 
