@@ -201,7 +201,8 @@ This repository includes a native `vercel.json` configured for **Vercel Services
     },
     "namanfhirfold": {
       "root": "python/namanfhirfold",
-      "runtime": "python"
+      "runtime": "python",
+      "entrypoint": "index.py"
     }
   },
   "rewrites": [

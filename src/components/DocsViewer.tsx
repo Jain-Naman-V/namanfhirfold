@@ -115,7 +115,8 @@ This repository is configured out-of-the-box for **Vercel Services** using the r
     },
     "namanfhirfold": {
       "root": "python/namanfhirfold",
-      "runtime": "python"
+      "runtime": "python",
+      "entrypoint": "index.py"
     }
   },
   "rewrites": [

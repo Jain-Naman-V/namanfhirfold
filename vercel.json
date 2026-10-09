@@ -15,7 +15,8 @@
     },
     "namanfhirfold": {
       "root": "python/namanfhirfold",
-      "runtime": "python"
+      "runtime": "python",
+      "entrypoint": "index.py"
     }
   },
   "rewrites": [
