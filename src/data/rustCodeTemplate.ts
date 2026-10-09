@@ -1,13 +1,19 @@
 /**
- * Production-ready Rust Implementation: `fhir_compact` / `rtk_compress`
+ * Production-ready Rust Implementation: `namanfhirfold`
+ * Tagline: "Fold the structure. Keep every detail."
  * Designed for sub-millisecond EHR gateway microservices, CDS Hooks proxies, and Wasm targets.
  */
 
 export const RUST_CARGO_TOML = `[package]
-name = "fhir_compact"
+name = "namanfhirfold"
 version = "0.1.0"
 edition = "2021"
-description = "High-performance zero-copy FHIR R4 token compression engine for CDS Hooks and LLMs"
+authors = ["Naman <naman@scanbo.com>"]
+description = "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/naman/namanfhirfold"
+keywords = ["fhir", "llm", "tokens", "healthcare", "cds-hooks"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -23,9 +29,12 @@ default = []
 wasm = ["wasm-bindgen"]
 `;
 
-export const RUST_COMPACT_CODE = `// src/lib.rs
-// FHIR R4 Token Compression & Clinical Context Extraction Engine
-// Designed for sub-millisecond Clinical Decision Support (CDS) & LLM context preparation.
+export const RUST_COMPACT_CODE = `//! # namanfhirfold 🦀
+//!
+//! > **Fold the structure. Keep every detail.**
+//!
+//! Zero-copy FHIR R4 token compression & clinical context extraction engine.
+//! Designed for sub-millisecond Clinical Decision Support (CDS) & LLM reasoning agents.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

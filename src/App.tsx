@@ -135,20 +135,20 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-sm shadow-emerald-500/20">
-                <Activity className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-sm shadow-orange-500/20 font-black">
+                🦀
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
-                    ClinContext FHIR
+                  <h1 className="text-base font-bold text-gray-900 dark:text-white tracking-tight font-mono">
+                    namanfhirfold
                   </h1>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Task-Aware Context Optimizer
+                    Rust • NPM • Python
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Left: Raw FHIR Bundle → Right: Task-Aware Context (Vitals vs Labs • Tabular Viewer • Safety Set)
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium italic">
+                  Fold the structure. Keep every detail.
                 </p>
               </div>
             </div>
@@ -186,12 +186,12 @@ export default function App() {
                 onClick={() => setActiveTab("package_hub")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                   activeTab === "package_hub"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 font-bold shadow-xs"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 <Package className="w-3.5 h-3.5 text-amber-500" />
-                <span>NPM / Rust Package</span>
+                <span>Publish & Packages</span>
               </button>
 
               {/* Tab 4: Docs */}
@@ -199,7 +199,7 @@ export default function App() {
                 onClick={() => setActiveTab("docs")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                   activeTab === "docs"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
@@ -212,7 +212,7 @@ export default function App() {
                 onClick={() => setActiveTab("benchmark")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                   activeTab === "benchmark"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
@@ -225,7 +225,7 @@ export default function App() {
                 onClick={() => setActiveTab("architecture")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                   activeTab === "architecture"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
@@ -238,12 +238,12 @@ export default function App() {
                 onClick={() => setActiveTab("rust_crate")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                   activeTab === "rust_crate"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 font-bold shadow-xs"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
-                <Code2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Crate Code</span>
+                <Code2 className="w-3.5 h-3.5 text-orange-500" />
+                <span>Rust Crate</span>
               </button>
             </nav>
           </div>

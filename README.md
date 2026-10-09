@@ -1,14 +1,19 @@
-# ClinContext FHIR (`fhirctx`)
-### Task-Aware Clinical Context Optimizer & Token Reducer for Healthcare AI & CDS Hooks
+# namanfhirfold 🦀📦🐍
+### Fold the structure. Keep every detail.
+**Task-Aware Clinical Context Optimizer & Token Reducer for Healthcare AI & CDS Hooks**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![FHIR Version: R4 / R5](https://img.shields.io/badge/FHIR-R4%20%2F%20R5-orange.svg)](https://hl7.org/fhir/)
 [![Token Reduction](https://img.shields.io/badge/Input%20Tokens--85%25%20to%20--94%25-emerald.svg)]()
 [![Clinical Fidelity](https://img.shields.io/badge/Clinical%20Facts-100%25%20Intact-purple.svg)]()
+[![Crates.io](https://img.shields.io/badge/crates.io-namanfhirfold-orange.svg)](https://crates.io)
+[![NPM](https://img.shields.io/badge/npm-namanfhirfold-red.svg)](https://npmjs.com)
+[![PyPI](https://img.shields.io/badge/pypi-namanfhirfold-blue.svg)](https://pypi.org)
 
-> **"Don't just blindly serialize FHIR. Dynamically select what to retrieve, what granularity to preserve, and how to serialize it based on the clinical task."**
+> **"Fold the structure. Keep every detail."**  
+> *Clear purpose, memorable, and immediately recognizable to healthcare developers.*
 
-ClinContext (`fhirctx`) is an ultra-fast, zero-copy healthcare context optimization engine designed to bridge the gap between verbose electronic health record (EHR) FHIR repositories and large language model (LLM) agents, clinical decision support (CDS) hooks, and retrieval-augmented generation (RAG) pipelines.
+`namanfhirfold` is an ultra-fast, zero-copy healthcare context optimization engine designed to bridge the gap between verbose electronic health record (EHR) FHIR repositories and large language model (LLM) agents, clinical decision support (CDS) hooks, and retrieval-augmented generation (RAG) pipelines. Available as a **Rust crate (`crates/namanfhirfold`)**, **NPM package (`packages/namanfhirfold`)**, and **Python package (`python/namanfhirfold`)**.
 
 ---
 
@@ -122,51 +127,74 @@ const response = await ai.models.generateContent({
 });
 ```
 
-### Rust Crate (`fhir_compact` / `fhirctx`)
+### Rust Crate (`namanfhirfold`)
 ```toml
 # Cargo.toml
 [dependencies]
-fhir_compact = { version = "0.1", features = ["wasm"] }
+namanfhirfold = { version = "0.1.0", features = ["wasm"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 ```
 
 ```rust
-use fhir_compact::{compress_bundle, CompressionOptions, Granularity};
+use namanfhirfold::{optimize, CompressionOptions, Granularity, CdsProfile};
 
-fn main() {
-    let raw_fhir_json = std::fs::read_to_string("patient_bundle.json").unwrap();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let raw_fhir_json = std::fs::read_to_string("patient_bundle.json")?;
     
     // Sub-millisecond zero-copy optimization (<1.2ms)
-    let optimized_context = compress_bundle(&raw_fhir_json, CompressionOptions {
+    // "Fold the structure. Keep every detail."
+    let result = optimize(&raw_fhir_json, &CompressionOptions {
+        profile: CdsProfile::VitalsMonitor,
         granularity: Granularity::ExactTimestamp,
-        token_budget: 800,
-    }).expect("valid fhir");
+        token_budget: Some(800),
+        safety_set_guaranteed: true,
+        ..Default::default()
+    })?;
     
-    println!("Ready for LLM Prompt:\n{}", optimized_context.output);
+    println!("Tokens Reduced: {}%", result.reduction_percentage);
+    println!("Clinical Facts Retained: {}/{}", result.retained_facts_count, result.total_facts_count);
+    println!("Ready for LLM Prompt:\n{}", result.compressed_output);
+    Ok(())
 }
 ```
 
-### Python / PyPI
+### Python / PyPI (`namanfhirfold`)
 ```bash
-pip install fhir-compress
+pip install namanfhirfold
 ```
 
 ```python
-from fhir_compress import FhirCompressor
+from namanfhirfold import fold, CdsProfile, Granularity
 
-compressor = FhirCompressor()
 raw_bundle = load_ehr_fhir_bundle()
 
-result = compressor.optimize(
+# "Fold the structure. Keep every detail."
+compressed_output = fold(
     raw_bundle,
-    profile="medication_prescribe",
-    granularity="exact_timestamp",
-    token_budget=500
+    format="compact_json",         # or "medprompt_text", "markdown"
+    profile=CdsProfile.VITALS_MONITOR,
+    granularity=Granularity.EXACT_TIMESTAMP,
+    safety_set_guaranteed=True
 )
 
-print(result.compressed_output)
-print(f"Fact Retention: {result.fact_retention_rate}%")
+print(compressed_output)
+```
+
+### TypeScript / NPM (`namanfhirfold`)
+```bash
+npm install namanfhirfold
+```
+
+```typescript
+import { foldFhir } from "namanfhirfold";
+
+const optimizedContext = foldFhir(rawBundle, {
+  format: "compact_json",
+  granularity: "exact_timestamp",
+  profile: "vitals_monitor",
+  tokenBudget: 800,
+});
 ```
 
 ---

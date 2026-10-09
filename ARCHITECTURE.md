@@ -1,11 +1,16 @@
-# ClinContext (`fhirctx`) Architecture Specification
-### High-Performance, Zero-Copy Task-Aware Clinical Context Engine for EHRs, CDS Hooks, & LLM Agents
+# namanfhirfold Architecture Specification
+### Fold the structure. Keep every detail.
+**High-Performance Zero-Copy Task-Aware Clinical Context Engine in Rust, TypeScript, and Python**
 
 ---
 
 ## 1. Executive Summary & Design Contract
 
-ClinContext is not a simple JSON minifier. It is an **information-theoretic clinical context engine**. 
+> **`namanfhirfold`**  
+> **Tagline:** *"Fold the structure. Keep every detail."*  
+> **Mission:** Fold verbose nested FHIR R4 schema scaffolding while preserving 100% of clinical fidelity, codes, numbers, units, and timestamps.
+
+`namanfhirfold` is not a simple JSON minifier. It is an **information-theoretic clinical context engine** implemented in zero-copy Rust with TypeScript and Python ecosystem bridges. 
 
 ### The Core Contract:
 ```rust

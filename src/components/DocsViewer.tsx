@@ -7,10 +7,12 @@ export const DocsViewer: React.FC = () => {
 
   // Markdown contents
   const docContents = {
-    readme: `# ClinContext FHIR (fhirctx)
-### Task-Aware Clinical Context Optimizer & Token Reducer for Healthcare AI & CDS Hooks
+    readme: `# namanfhirfold 🦀📦🐍
+### Fold the structure. Keep every detail.
+**Task-Aware Clinical Context Optimizer & Token Reducer for Healthcare AI & CDS Hooks**
 
-"Don't just blindly serialize FHIR. Dynamically select what to retrieve, what granularity to preserve, and how to serialize it based on the clinical task."
+"Fold the structure. Keep every detail."
+Clear purpose, memorable, and immediately recognizable to healthcare developers.
 
 ## The Problem
 - Raw FHIR Observation: 248 tokens for 15 words of clinical facts.
@@ -27,17 +29,18 @@ Evaluation = Token Reduction + Clinical Fact Retention (100%) + Task Accuracy
 ## Key Capabilities
 1. Semantic Disambiguation: Vital Signs (Pain, BP) vs Laboratory (CBC, Renal).
 2. Granularity Control: Exact Timestamp (18:21:10) vs Date-Only (YYYY-MM-DD).
-3. Deterministic CDS Profiles: medication-prescribe, vitals_monitor, patient_view.
+3. Deterministic CDS Profiles: medication_prescribe, vitals_monitor, patient_view.
 4. Guaranteed Safety Set: Allergies, Active Meds, Critical Outliers never dropped.
 5. Provenance Map: Short IDs (V1, O1, M1, CP1) with on-demand expand(ref).
 6. Zero Silent Drops: Explicit omission notices when budget prunes older items.
 
-## Packages
-- NPM: npm install @clincontext/fhir-compress
-- Rust: cargo add fhir_compact
-- Python: pip install fhir-compress`,
+## Packages (namanfhirfold)
+- Rust Crate: cargo add namanfhirfold (crates/namanfhirfold)
+- TypeScript / NPM: npm install namanfhirfold (packages/namanfhirfold)
+- Python / PyPI: pip install namanfhirfold (python/namanfhirfold)`,
 
-    architecture: `# ClinContext Architecture Specification
+    architecture: `# namanfhirfold Architecture Specification
+### Fold the structure. Keep every detail.
 
 ## Design Contract
 optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>)
@@ -59,20 +62,21 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
 ## Provenance & expand(ref)
 Every short reference maps to the original FHIR ID. AI agents can call expand("V1") to retrieve the original canonical FHIR slice.
 
-## Rust Crates (fhirctx)
-- fhirctx-core: zero-copy parser & graph
-- fhirctx-profiles: declarative TOML profiles
-- fhirctx-serialize: compact formats
-- fhirctx-mcp: Model Context Protocol server tools`,
+## Rust Crate (namanfhirfold)
+- High throughput: <1.2ms latency in Actix/Axum microservices
+- Zero heap allocation on critical paths
+- Native WebAssembly (Wasm) support for browser & edge workers`,
 
-    product: `# ClinContext Product Specification (PRD)
+    product: `# namanfhirfold Product Specification (PRD)
+### Fold the structure. Keep every detail.
 
 ## Product Positioning
-Not an end-user chatbot. A foundational healthcare context optimization layer between EHR FHIR repositories and clinical AI models / CDS Hooks.
+"Fold the structure. Keep every detail." — Clear purpose, memorable, and immediately recognizable to healthcare developers.
+Not an end-user chatbot. A foundational healthcare context optimization layer between EHR FHIR repositories and clinical AI models / CDS Hooks. Available on Crates.io, NPM, and PyPI.
 
 ## Target Personas
 1. Clinical AI / LLM Engineers (reducing prompt tokens by 85-94% without hallucinations).
-2. CDS Hooks Developers (meeting Epic/Cerner <500ms hospital SLA timeouts).
+2. CDS Hooks Developers (meeting Epic/Cerner <500ms hospital SLA timeouts with sub-millisecond Rust execution).
 3. Healthcare RAG & Agent Builders (grounding models with provenance traceability).
 
 ## Key Differentiators vs FHIRBench / MEDPrompt

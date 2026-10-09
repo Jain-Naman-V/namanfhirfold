@@ -1,0 +1,28 @@
+{
+  "name": "namanfhirfold",
+  "version": "0.1.0",
+  "description": "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "fhir",
+    "llm",
+    "tokens",
+    "compression",
+    "healthcare",
+    "cds-hooks",
+    "medprompt",
+    "fhirbench"
+  ],
+  "author": "Naman <naman@scanbo.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/naman/namanfhirfold"
+  }
+}

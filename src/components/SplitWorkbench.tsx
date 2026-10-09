@@ -460,11 +460,11 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
                 2
               </div>
               <div>
-                <h3 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                  OUTPUT: Optimized Clinical Context
+                <h3 className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                  OUTPUT: <span className="font-mono text-emerald-600 dark:text-emerald-400">namanfhirfold</span> Context
                 </h3>
-                <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
-                  Categorized Vitals vs Labs • Provenance Short IDs (V1, O1)
+                <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 italic">
+                  Fold the structure. Keep every detail. • Provenance IDs (V1, O1, CP1)
                 </p>
               </div>
             </div>

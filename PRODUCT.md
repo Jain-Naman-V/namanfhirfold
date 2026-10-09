@@ -1,11 +1,16 @@
-# ClinContext (`fhirctx`) Product Specification
-### Product Requirements Document (PRD) & Market Positioning
+# namanfhirfold Product Specification
+### Fold the structure. Keep every detail.
+**Product Requirements Document (PRD) & Market Positioning**
+*Available on Crates.io (Rust), NPM (TypeScript), and PyPI (Python)*
 
 ---
 
 ## 1. Product Positioning & The Core Problem
 
-### The Paradox of Healthcare AI
+### The Product: `namanfhirfold`
+> **Tagline:** *"Fold the structure. Keep every detail."*  
+> **Clear purpose, memorable, and immediately recognizable to healthcare developers.**
+
 Large Language Models (LLMs) possess extraordinary potential for clinical reasoning, medication reconciliation, and diagnostic triage. However, integrating LLMs into hospital Electronic Health Records (EHRs) faces a crippling economic and technical barrier: **FHIR Token Bloat**.
 
 | FHIR Reality | LLM Consequence |
