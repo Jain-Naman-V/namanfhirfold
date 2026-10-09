@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "vite",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "namanfhirfold",
+          "format": "url",
+          "env": "NAMANFHIRFOLD_URL"
+        }
+      ]
+    },
+    "namanfhirfold": {
+      "root": "python/namanfhirfold",
+      "runtime": "python"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}

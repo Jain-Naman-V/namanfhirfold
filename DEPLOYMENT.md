@@ -175,6 +175,55 @@ EXPOSE 3000
 CMD ["tsx", "server.ts"]
 ```
 
+### Vercel Multi-Service Deployment (Frontend + Python Service)
+
+This repository includes a native `vercel.json` configured for **Vercel Services** (monorepo multi-service architecture):
+
+- **Service 1 (`app`)**: Vite React frontend + TypeScript serverless functions at root `.`.
+- **Service 2 (`namanfhirfold`)**: Zero-dependency Python clinical optimizer service in `python/namanfhirfold`.
+- **Binding**: `NAMANFHIRFOLD_URL` is automatically injected into `app` so TypeScript functions call the Python service internally without exposing it publicly.
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "vite",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "namanfhirfold",
+          "format": "url",
+          "env": "NAMANFHIRFOLD_URL"
+        }
+      ]
+    },
+    "namanfhirfold": {
+      "root": "python/namanfhirfold",
+      "runtime": "python"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}
+```
+
+#### How to Deploy on Vercel:
+1. Push this commit to your GitHub repository (`namanscanbotesting/fhiroptimizer`).
+2. In Vercel, import your project. Vercel will detect `vercel.json` automatically.
+3. Select **Services** mode.
+4. Set the optional environment variable `GEMINI_API_KEY` in Project Settings.
+5. Click **Deploy**. Vercel will build both services in parallel and configure internal service discovery!
+
+---
+
 ### Google Cloud Run
 Deploying to Cloud Run gives you automatic TLS, scale-to-zero, and autoscaling up to thousands of requests/sec:
 

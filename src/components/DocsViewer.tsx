@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { BookOpen, FileText, Layers, Package, Copy, Check } from "lucide-react";
 
 export const DocsViewer: React.FC = () => {
-  const [selectedDoc, setSelectedDoc] = useState<"readme" | "architecture" | "product">("readme");
+  const [selectedDoc, setSelectedDoc] = useState<"readme" | "architecture" | "product" | "deployment">("readme");
   const [copied, setCopied] = useState(false);
 
   // Markdown contents
@@ -89,7 +89,57 @@ Not an end-user chatbot. A foundational healthcare context optimization layer be
 - Unit Invariance: Units are never mutated or converted silently.
 - Error Filtering: Resources marked entered-in-error are never forwarded.
 - Zero Silent Drops: Pruned historical records always emit an explicit omission notice.
-- HIPAA Compliant: Stateless transformation; zero patient data persisted.`
+- HIPAA Compliant: Stateless transformation; zero patient data persisted.`,
+
+    deployment: `# namanfhirfold Deployment & Vercel Services Runbook 🚀
+### Fold the structure. Keep every detail.
+
+## 1. Vercel Multi-Service Deployment
+This repository is configured out-of-the-box for **Vercel Services** using the root \`vercel.json\`:
+
+\`\`\`json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "vite",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "namanfhirfold",
+          "format": "url",
+          "env": "NAMANFHIRFOLD_URL"
+        }
+      ]
+    },
+    "namanfhirfold": {
+      "root": "python/namanfhirfold",
+      "runtime": "python"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}
+\`\`\`
+
+### Vercel Deployment Steps:
+1. Connect GitHub repository (namanscanbotesting/fhiroptimizer).
+2. Choose 'Services' mode when prompted.
+3. Vercel automatically maps 'app' to the Vite React frontend and 'namanfhirfold' to the Python optimizer.
+4. The binding NAMANFHIRFOLD_URL connects the services privately.
+5. Add GEMINI_API_KEY in Vercel Environment Variables for real-time CDS reasoning.
+
+## 2. Docker / Cloud Run / Kubernetes
+- Docker: Full-stack node:20-alpine runner with Vite static bundle + API routes.
+- Cloud Run: Sub-second cold starts with 512MB RAM.
+- Rust Microservice: Standalone Actix-Web binary <1.2ms latency on port 8080.`
   };
 
   const copyDoc = () => {
@@ -148,6 +198,16 @@ Not an end-user chatbot. A foundational healthcare context optimization layer be
             >
               PRODUCT.md
             </button>
+            <button
+              onClick={() => setSelectedDoc("deployment" as any)}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                selectedDoc === "deployment"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold"
+                  : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+              }`}
+            >
+              DEPLOYMENT.md (Vercel)
+            </button>
           </div>
 
           <button
@@ -167,8 +227,8 @@ Not an end-user chatbot. A foundational healthcare context optimization layer be
       </div>
 
       <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>Files saved on disk: <code>/README.md</code>, <code>/ARCHITECTURE.md</code>, <code>/PRODUCT.md</code></span>
-        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Production-Ready Healthcare Specifications</span>
+        <span>Files saved on disk: <code>/vercel.json</code>, <code>/README.md</code>, <code>/ARCHITECTURE.md</code>, <code>/PRODUCT.md</code>, <code>/DEPLOYMENT.md</code></span>
+        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Production-Ready Healthcare & Vercel Services Specs</span>
       </div>
     </div>
   );

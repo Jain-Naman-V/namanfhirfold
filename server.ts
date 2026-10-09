@@ -28,11 +28,33 @@ if (geminiApiKey) {
 }
 
 // API: Compress FHIR payload
-app.post("/api/compress", (req: Request, res: Response) => {
+app.post("/api/compress", async (req: Request, res: Response) => {
   try {
     const { fhir, options } = req.body;
     if (!fhir) {
       return res.status(400).json({ error: "Missing FHIR payload" });
+    }
+
+    // Vercel Service Binding: if internal Python microservice is bound
+    const pythonServiceUrl = process.env.NAMANFHIRFOLD_URL;
+    if (pythonServiceUrl) {
+      try {
+        const targetUrl = new URL("/", pythonServiceUrl).toString();
+        const pyRes = await fetch(targetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fhir, ...(options || {}) }),
+        });
+        if (pyRes.ok) {
+          const pyData = await pyRes.json();
+          return res.json({
+            ...pyData,
+            engine: "namanfhirfold-python-service",
+          });
+        }
+      } catch (bindErr) {
+        console.warn("NAMANFHIRFOLD_URL binding call failed, falling back to local TypeScript engine:", bindErr);
+      }
     }
 
     const defaultOpts: CompressionOptions = {
@@ -110,8 +132,25 @@ Instructions:
 });
 
 // Health check
-app.get("/api/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", geminiEnabled: !!ai });
+app.get("/api/health", async (_req: Request, res: Response) => {
+  let pythonServiceStatus = "not_configured";
+  if (process.env.NAMANFHIRFOLD_URL) {
+    try {
+      const pyHealthRes = await fetch(new URL("/", process.env.NAMANFHIRFOLD_URL).toString());
+      pythonServiceStatus = pyHealthRes.ok ? "connected" : "unhealthy";
+    } catch {
+      pythonServiceStatus = "unreachable";
+    }
+  }
+
+  res.json({
+    status: "ok",
+    geminiEnabled: !!ai,
+    services: {
+      app: "healthy",
+      namanfhirfold_binding: pythonServiceStatus,
+    },
+  });
 });
 
 // Vite middleware or static serving

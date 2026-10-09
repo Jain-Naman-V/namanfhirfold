@@ -1,0 +1,2 @@
+# Vercel Python runtime requirements
+# namanfhirfold core has 0 external dependencies (uses Python standard library: json, re, enum, typing)
