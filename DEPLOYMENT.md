@@ -138,7 +138,7 @@ Directory: `/crates/namanfhirfold`
 
 ## 3. Full-Stack Web Application Deployment
 
-The application includes an Express.js backend server (`server.ts`) hosting the compression API and Gemini proxy, alongside the React Vite frontend.
+The application includes an Express.js backend server (`server.ts`) hosting the compression API and OpenAI-compatible LLM proxy, alongside the React Vite frontend.
 
 ### Dockerfile
 Create a production container image using Node 20 Alpine:
@@ -275,12 +275,12 @@ gcloud run deploy namanfhirfold \
   --port 3000 \
   --memory 512Mi \
   --cpu 1 \
-  --set-env-vars GEMINI_API_KEY="your-gemini-api-key"
+  --set-env-vars OPENAI_API_KEY="your-openai-api-key",OPENAI_BASE_URL="https://api.openai.com/v1",OPENAI_MODEL="gpt-4o-mini"
 ```
 
 ### AWS ECS / Render / Railway
 1. **Render.com / Railway:** Connect your GitHub repo, select **Node Environment**, set Build Command: `npm run build`, and Start Command: `npm start` (or `npx tsx server.ts`).
-2. **Environment Variable:** Add `GEMINI_API_KEY` in the environment settings dashboard.
+2. **Environment Variables:** Add `OPENAI_API_KEY` (plus optional `OPENAI_BASE_URL` / `OPENAI_MODEL`) in the environment settings dashboard.
 
 ---
 
@@ -368,7 +368,9 @@ export default {
 |---|---|---|---|
 | `PORT` | Listening port for Express server | No | `3000` |
 | `NODE_ENV` | Runtime environment (`production` / `development`) | No | `development` |
-| `GEMINI_API_KEY` | Google Gemini API Key for test inference | Optional | Provided by server proxy |
+| `OPENAI_API_KEY` | OpenAI-compatible API key for test inference | Optional | Compression works without it |
+| `OPENAI_BASE_URL` | OpenAI-compatible endpoint base URL | Optional | `https://api.openai.com/v1` |
+| `OPENAI_MODEL` | Model id for inference | Optional | `gpt-4o-mini` |
 
 ### HIPAA & Data Governance Compliance
 1. **Stateless Processing:** `namanfhirfold` is purely in-memory and stateless. No patient identifiers, FHIR bundles, or tokens are written to disk or databases.
@@ -388,7 +390,7 @@ curl -i http://localhost:3000/api/health
 HTTP/1.1 200 OK
 Content-Type: application/json
 
-{"status":"ok","geminiEnabled":true}
+{"status":"ok","llmConfigured":true}
 ```
 
 ### Production Smoke Test

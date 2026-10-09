@@ -102,7 +102,6 @@ npm install @clincontext/fhir-compress
 
 ```typescript
 import { compressFhir } from "@clincontext/fhir-compress";
-import { GoogleGenAI } from "@google/genai";
 
 // 1. Fetch raw FHIR bundle from EHR or SMART-on-FHIR server
 const rawBundle = await fetchPatientBundle(patientId);
@@ -119,12 +118,19 @@ const optimizedContext = compressFhir(rawBundle, {
 console.log(optimizedContext.tokenMultiple); // e.g. 9.2x fewer input tokens
 console.log(optimizedContext.clinicalFacts); // 100% facts intact
 
-// 3. Send clean context to LLM prompt
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const response = await ai.models.generateContent({
-  model: "gemini-3.8-flash",
-  contents: `Patient Clinical Context:\n${optimizedContext.compressedOutput}\n\nQuery: What was the pain score?`
+// 3. Send clean context to any OpenAI-compatible LLM endpoint
+const res = await fetch(`${process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/chat/completions`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+  },
+  body: JSON.stringify({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    messages: [{ role: "user", content: `Patient Clinical Context:\n${optimizedContext.compressedOutput}\n\nQuery: What was the pain score?` }],
+  }),
 });
+const response = await res.json();
 ```
 
 ### Rust Crate (`namanfhirfold`)

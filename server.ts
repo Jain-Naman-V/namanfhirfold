@@ -1,9 +1,9 @@
 import express, { Request, Response } from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
 import { compressFhir } from "./src/services/fhirCompressor.ts";
 import { CompressionOptions } from "./src/types/fhir.ts";
+import { askCds, llmConfigured, llmModelName } from "./llm.ts";
 
 dotenv.config();
 
@@ -12,20 +12,6 @@ const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === "production";
 
 app.use(express.json({ limit: "25mb" }));
-
-// Server-side Gemini initialization
-const geminiApiKey = process.env.GEMINI_API_KEY || "";
-let ai: GoogleGenAI | null = null;
-if (geminiApiKey) {
-  ai = new GoogleGenAI({
-    apiKey: geminiApiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
-  });
-}
 
 // API: Compress FHIR payload
 app.post("/api/compress", async (req: Request, res: Response) => {
@@ -83,51 +69,29 @@ app.post("/api/evaluate-llm", async (req: Request, res: Response) => {
 
   const startTime = Date.now();
 
-  if (!ai) {
+  if (!llmConfigured) {
     // Graceful fallback if API key is not configured in environment
     const latency = Date.now() - startTime;
     return res.json({
-      answer: `[Simulated CDS / LLM Analysis without API key]\n\nClinical Query: "${query}"\n\nVerified from Context: The clinical data was analyzed successfully. The extracted values and ranges were processed with 100% fidelity.\n\n(Tip: When GEMINI_API_KEY is active, this calls live gemini-3.8-flash for real-time inference).`,
+      answer: `[Simulated CDS / LLM Analysis without API key]\n\nClinical Query: "${query}"\n\nVerified from Context: The clinical data was analyzed successfully. The extracted values and ranges were processed with 100% fidelity.\n\n(Tip: Set OPENAI_API_KEY in your environment to enable live ${llmModelName} inference. Compression works without it.`,
       latencyMs: latency + 180,
-      modelUsed: "gemini-3.8-flash (simulated)",
+      modelUsed: `${llmModelName} (simulated)`,
       tokenEstimate: Math.round(context.length / 3.8),
     });
   }
 
   try {
-    const prompt = `You are an expert Clinical Decision Support (CDS) reasoning engine.
-Analyze the following patient context and answer the clinical query precisely and concisely.
-
-Patient Clinical Context:
-${context}
-
-Clinical Query:
-${query}
-
-Instructions:
-1. Provide a direct, factual clinical answer based only on the provided context.
-2. Note any abnormal values, dosages, or contraindications clearly.
-3. Be concise and clinician-ready.`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: "You are a clinical decision support assistant. Be accurate, concise, and clinically rigorous.",
-        temperature: 0.2,
-      },
-    });
-
+    const answer = await askCds(query, context);
     const latencyMs = Date.now() - startTime;
     return res.json({
-      answer: response.text || "No response generated.",
+      answer,
       latencyMs,
-      modelUsed: "gemini-3.8-flash",
-      tokenEstimate: Math.round((context.length + prompt.length) / 3.8),
+      modelUsed: llmModelName,
+      tokenEstimate: Math.round(context.length / 3.8),
     });
   } catch (err: any) {
-    console.error("Gemini API error:", err);
-    return res.status(500).json({ error: err.message || "Gemini inference failed" });
+    console.error("LLM API error:", err);
+    return res.status(500).json({ error: err.message || "LLM inference failed" });
   }
 });
 
@@ -145,7 +109,7 @@ app.get("/api/health", async (_req: Request, res: Response) => {
 
   res.json({
     status: "ok",
-    geminiEnabled: !!ai,
+    llmConfigured,
     services: {
       app: "healthy",
       namanfhirfold_binding: pythonServiceStatus,

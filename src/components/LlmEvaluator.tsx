@@ -75,7 +75,7 @@ export const LlmEvaluator: React.FC<LlmEvaluatorProps> = ({
           <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Live LLM Verification (Gemini 3.8 Flash)
+              Live LLM Verification
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Execute identical clinical query against Raw FHIR vs Compressed Context to verify clinical accuracy and token savings.

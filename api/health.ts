@@ -17,7 +17,7 @@ export default async function handler(req: Request, res: Response) {
   return res.json({
     status: "ok",
     runtime: "vercel-serverless",
-    geminiConfigured: !!process.env.GEMINI_API_KEY,
+    llmConfigured: !!process.env.OPENAI_API_KEY,
     services: {
       app: "healthy",
       namanfhirfold_binding: pythonServiceStatus,

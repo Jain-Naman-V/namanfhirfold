@@ -122,7 +122,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
         tokens: data.tokenEstimate,
       });
     } catch (err: any) {
-      setLlmError(err.message || "Failed to query Gemini model");
+      setLlmError(err.message || "Failed to query LLM model");
     } finally {
       setTestingLlm(false);
     }
@@ -508,7 +508,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           {/* Quick LLM Test Trigger Bar */}
           <div className="p-3 bg-gray-50 dark:bg-gray-800/40 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
             <span className="text-[11px] text-gray-500 dark:text-gray-400">
-              Verify accuracy on Gemini 3.8 Flash:
+              Verify accuracy on your configured LLM:
             </span>
             <button
               onClick={runQuickLlmTest}
@@ -537,7 +537,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-blue-500/20">
             <div className="flex items-center gap-2 text-xs font-bold text-blue-800 dark:text-blue-300">
               <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Live Gemini 3.8 Flash Clinical Answer (Verified on Optimized Input):</span>
+              <span>Live LLM Clinical Answer (Verified on Optimized Input):</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] font-mono text-blue-700 dark:text-blue-300">
               <span className="flex items-center gap-1">
