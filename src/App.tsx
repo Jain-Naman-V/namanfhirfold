@@ -28,9 +28,11 @@ import { CrateExporter } from "./components/CrateExporter.tsx";
 import { PackageHub } from "./components/PackageHub.tsx";
 import { SplitWorkbench } from "./components/SplitWorkbench.tsx";
 import { DocsViewer } from "./components/DocsViewer.tsx";
+import { FhirTabularViewer } from "./components/FhirTabularViewer.tsx";
 import {
   Activity,
   Cpu,
+  Table,
   BarChart3,
   Layers,
   Code2,
@@ -39,7 +41,7 @@ import {
 } from "lucide-react";
 
 type SampleKey = "pain" | "careplan" | "hemoglobin" | "20_labs" | "full_cds" | "custom";
-type TabKey = "workbench" | "package_hub" | "docs" | "benchmark" | "architecture" | "rust_crate";
+type TabKey = "workbench" | "tabular_viewer" | "package_hub" | "docs" | "benchmark" | "architecture" | "rust_crate";
 
 export default function App() {
   const [selectedSample, setSelectedSample] = useState<SampleKey>("pain");
@@ -146,24 +148,40 @@ export default function App() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Left: Raw FHIR Bundle → Right: Task-Aware Context (Vitals vs Labs • Provenance Map • Safety Set)
+                  Left: Raw FHIR Bundle → Right: Task-Aware Context (Vitals vs Labs • Tabular Viewer • Safety Set)
                 </p>
               </div>
             </div>
 
             {/* Navigation Tabs */}
             <nav className="flex items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-xl text-xs overflow-x-auto">
+              {/* Tab 1: Split Workbench */}
               <button
                 onClick={() => setActiveTab("workbench")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                   activeTab === "workbench"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs font-bold"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 }`}
               >
                 <Cpu className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Split Workbench</span>
               </button>
+
+              {/* Tab 2: Tabular Viewer (Chicago PCDC Style) */}
+              <button
+                onClick={() => setActiveTab("tabular_viewer")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
+                  activeTab === "tabular_viewer"
+                    ? "bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-300 font-bold shadow-xs"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                <Table className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Tabular Viewer</span>
+              </button>
+
+              {/* Tab 3: Package Hub */}
               <button
                 onClick={() => setActiveTab("package_hub")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
@@ -175,6 +193,8 @@ export default function App() {
                 <Package className="w-3.5 h-3.5 text-amber-500" />
                 <span>NPM / Rust Package</span>
               </button>
+
+              {/* Tab 4: Docs */}
               <button
                 onClick={() => setActiveTab("docs")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
@@ -186,6 +206,8 @@ export default function App() {
                 <BookOpen className="w-3.5 h-3.5 text-purple-500" />
                 <span>Specs & Docs</span>
               </button>
+
+              {/* Tab 5: Benchmark Matrix */}
               <button
                 onClick={() => setActiveTab("benchmark")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
@@ -197,6 +219,8 @@ export default function App() {
                 <BarChart3 className="w-3.5 h-3.5 text-indigo-500" />
                 <span>FHIRBench Matrix</span>
               </button>
+
+              {/* Tab 6: CDS Pipeline */}
               <button
                 onClick={() => setActiveTab("architecture")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
@@ -208,6 +232,8 @@ export default function App() {
                 <Layers className="w-3.5 h-3.5 text-blue-500" />
                 <span>CDS Pipeline</span>
               </button>
+
+              {/* Tab 7: Rust Crate */}
               <button
                 onClick={() => setActiveTab("rust_crate")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
@@ -279,27 +305,35 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 2: Package & SDK Hub */}
+        {/* Tab 2: Tabular Viewer (Chicago PCDC Style - With Category & Without Category) */}
+        {activeTab === "tabular_viewer" && (
+          <FhirTabularViewer
+            rawJsonText={rawJsonText}
+            result={result}
+          />
+        )}
+
+        {/* Tab 3: Package & SDK Hub */}
         {activeTab === "package_hub" && (
           <PackageHub />
         )}
 
-        {/* Tab 3: System Specifications & Documentation */}
+        {/* Tab 4: System Specifications & Documentation */}
         {activeTab === "docs" && (
           <DocsViewer />
         )}
 
-        {/* Tab 4: FHIRBench Benchmark Matrix */}
+        {/* Tab 5: FHIRBench Benchmark Matrix */}
         {activeTab === "benchmark" && (
           <BenchmarkMatrix rawTokens={result.rawTokens} />
         )}
 
-        {/* Tab 5: Architecture Pipeline */}
+        {/* Tab 6: Architecture Pipeline */}
         {activeTab === "architecture" && (
           <ArchitectureDiagram />
         )}
 
-        {/* Tab 6: Rust & TS Crate Export */}
+        {/* Tab 7: Rust & TS Crate Export */}
         {activeTab === "rust_crate" && (
           <CrateExporter />
         )}
