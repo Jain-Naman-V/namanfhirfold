@@ -1,9 +1,9 @@
 /**
- * ClinContext Task-Aware FHIR Context Optimizer
- * 
+ * namanfhirfold Task-Aware FHIR Context Optimizer
+ *
  * CONTRACT:
  * optimize(bundle, intent, token_budget) -> compact_context + provenance_map
- * 
+ *
  * 6-Stage Pipeline:
  * 1. Parse & reference indexing
  * 2. Lossless strip (meta, text.div, URIs, search wrappers)
@@ -781,4 +781,45 @@ export function compressFhir(
     omittedItemsNotice: omittedNotice,
     resourceBreakdown,
   };
+}
+
+/**
+ * Expand a short reference (e.g. "P1", "V1", "O1", "M1", "C1", "A1", "CP1")
+ * back into the original FHIR resource using a provenance map produced by
+ * `compressFhir()`. Returns null if the reference is unknown.
+ *
+ * Keep the provenance map in your own process — do not send it to the LLM.
+ */
+export function expand(
+  provenanceMap: Record<string, ProvenanceEntry>,
+  shortRef: string
+): FhirResource | null {
+  const entry = provenanceMap[shortRef];
+  if (!entry || entry.fullSnippet == null) return null;
+  return JSON.parse(JSON.stringify(entry.fullSnippet)) as FhirResource;
+}
+
+/**
+ * Convenience wrapper: fold the raw input once, then expand `shortRef`.
+ * Prefer keeping the `CompressionResult` and calling `expand()` on it when
+ * you need multiple refs — this helper re-runs the whole pipeline.
+ */
+export function expandFromBundle(
+  fhirPayload: string | object,
+  shortRef: string,
+  options?: Partial<CompressionOptions>
+): FhirResource | null {
+  const opts = {
+    format: "compact_json",
+    granularity: "exact_timestamp",
+    tokenBudget: 800,
+    stripMeta: true,
+    stripNarrativeText: true,
+    normalizeCodingSystems: true,
+    stripRedundantReferences: true,
+    stripCategory: true,
+    ...(options || {}),
+  } as CompressionOptions;
+  const result = compressFhir(fhirPayload, opts);
+  return expand(result.provenanceMap, shortRef);
 }

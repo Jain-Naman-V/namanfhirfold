@@ -1,5 +1,5 @@
 /**
- * ClinContext FHIR - Task-Aware Context Optimizer & Provenance Engine
+ * namanfhirfold - Task-Aware Context Optimizer & Provenance Engine
  * High-performance FHIR token compression based on FHIRBench, MedPrompt & FHIR-MCP.
  */
 
@@ -341,7 +341,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
-        ClinContext Engine • Standardized Metric: Token Reduction + Clinical Information Retention + Task Accuracy
+        namanfhirfold engine • Standardized Metric: Token Reduction + Clinical Information Retention + Task Accuracy
       </footer>
     </div>
   );

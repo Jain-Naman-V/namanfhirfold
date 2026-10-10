@@ -19,7 +19,7 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
 ```
 
 ### Architectural Axioms:
-1. **FHIR is the Canonical Source of Truth:** Never mutate or replace FHIR repositories in the EHR. ClinContext operates strictly as an edge gateway or proxy before inference.
+1. **FHIR is the Canonical Source of Truth:** Never mutate or replace FHIR repositories in the EHR. namanfhirfold operates strictly as an edge gateway or proxy before inference.
 2. **Task-Aware > Universal Compression:** Compression without clinical task context is dangerous. A prescription review requires different fields than an ICU vitals trend check.
 3. **Guaranteed Safety Set:** Allergies, active medications, critical abnormal values, and active care plan instructions are **never silently dropped**.
 4. **Reversible via Provenance:** Every compressed line carries a short reference (`O1`, `V1`, `M1`, `CP1`) mapping back to the raw FHIR resource ID. If an agent requires deeper context, it invokes `expand(ref)`.
@@ -38,7 +38,7 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
                            │ (5,000–25,000 tokens)
                            ▼
 ┌────────────────────────────────────────────────────────┐
-│             ClinContext / fhirctx Gateway              │
+│             namanfhirfold Gateway              │
 │                                                        │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │ Stage 1: Parse & Streaming Reference Indexing    │  │
@@ -112,7 +112,7 @@ Removes schema boilerplate that confers zero clinical semantics:
 - **Deduplication:** Merges repeated Practitioner, Organization, and Patient metadata references down to a single instance. Deduplicates identical repeated observations while strictly preserving distinct temporal readings.
 
 ### Stage 4: Task-Aware Intent Selection
-ClinContext bifurcates selection into two operating modes:
+namanfhirfold bifurcates selection into two operating modes:
 
 #### Mode A: Deterministic CDS Hook Profiles (Fast, Safe, Zero-LLM)
 For strict latency and compliance constraints, hard-coded declarative profiles select relevant clinical concepts:
@@ -152,7 +152,7 @@ When a `token_budget` (e.g. 800 tokens) is specified:
 
 A common flaw in naive FHIR converters is categorizing every `Observation` as a "lab test".
 
-ClinContext inspects both `category.coding` and LOINC terminology to enforce semantic boundaries:
+namanfhirfold inspects both `category.coding` and LOINC terminology to enforce semantic boundaries:
 ```typescript
 // LOINC Classification Table
 const VITAL_SIGN_LOINCS = [
@@ -186,7 +186,7 @@ Output payloads strictly distinguish:
 
 ## 5. Granularity Architecture
 
-ClinContext supports two temporal granularity modes:
+namanfhirfold supports two temporal granularity modes:
 
 1. **`exact_timestamp` Mode:**
    - Preserves complete ISO-8601 timestamps: `"2015-06-05T18:21:10-04:00"`.
@@ -200,7 +200,7 @@ ClinContext supports two temporal granularity modes:
 
 ## 6. Provenance & The `expand(ref)` AI Agent Tool
 
-To enable lossy token reduction with **zero clinical hallucination risk**, ClinContext implements an interactive Provenance contract:
+To enable lossy token reduction with **zero clinical hallucination risk**, namanfhirfold implements an interactive Provenance contract:
 
 ```
 LLM Prompt Context:
@@ -222,19 +222,24 @@ The server resolves `CP1` in the `provenanceMap` and returns the exact canonical
 
 ---
 
-## 7. Rust Crate Architecture (`fhirctx`)
+## 7. Rust Crate Architecture (`namanfhirfold`)
 
-The production core is organized as modular Rust crates:
+The published crate is a single library with four modules:
 
 ```
-crates/
- ├── fhirctx-core/       # Zero-copy streaming parser, reference graph, deduplication
- ├── fhirctx-profiles/   # Declarative TOML/JSON CDS Hook profiles
- ├── fhirctx-serialize/  # Compact JSON, MedPrompt narrative, and Markdown generators
- ├── fhirctx-tokens/     # High-accuracy BPE/tiktoken token counting
- ├── fhirctx-mcp/        # Model Context Protocol (MCP) server integration
- └── fhirctx-cli/        # Command-line tool (cat bundle.json | fhirctx --budget 800)
+crates/namanfhirfold/
+ └── src/
+      ├── lib.rs         # Public API: optimize(), expand(), expand_from_result(), short_refs()
+      ├── models.rs      # Bundle/Fact/ProvenanceEntry/OptimizationResult data models
+      ├── profiles.rs    # Declarative CDS Hook profiles (medication-prescribe, patient-view, ...)
+      └── optimizer.rs   # 6-stage pipeline, budgeting, safety set, provenance map
 ```
+
+Optional `wasm` feature exposes `optimize_wasm()` via `wasm-bindgen`.
+
+> **Planned (not yet implemented):** splitting into `namanfhirfold-core` / `-profiles` /
+> `-serialize` / `-tokens` / `-mcp` / `-cli` once the MCP server and CLI ship. Today the
+> single crate is the only published artifact.
 
 ### Integration Modes:
 1. **Embedded Rust Crate:** Linked directly into high-throughput Rust EHR gateways.

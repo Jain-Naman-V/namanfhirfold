@@ -148,7 +148,7 @@ The app runs completely in the browser with WebAssembly and client-side TypeScri
 }
 \`\`\`
 
-1. Connect GitHub repository (namanscanbotesting/fhiroptimizer).
+1. Connect GitHub repository (Jain-Naman-V/namanfhirfold).
 2. Select **Standalone / Vite** preset.
 3. Build Command: \`npm run build\`, Output: \`dist\`.
 4. Click Deploy — Live in under 30 seconds!

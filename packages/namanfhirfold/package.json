@@ -2,12 +2,39 @@
   "name": "namanfhirfold",
   "version": "0.1.0",
   "description": "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs.",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && npm run build:esm && npm run build:cjs && node scripts/finalize.cjs",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
     "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "keywords": [
     "fhir",
@@ -19,10 +46,13 @@
     "medprompt",
     "fhirbench"
   ],
-  "author": "Naman <naman@scanbo.com>",
+  "author": "Jain-Naman-V <namanvjain456@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/naman/namanfhirfold"
+    "url": "https://github.com/Jain-Naman-V/namanfhirfold"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }

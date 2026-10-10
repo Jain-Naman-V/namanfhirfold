@@ -11,7 +11,7 @@ export const ArchitectureDiagram: React.FC = () => {
             End-to-End CDS & LLM Gateway Architecture
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            How the ClinContext Token Reducer integrates between EHR / FHIR servers and Clinical Decision Support (CDS) pipelines.
+            How the namanfhirfold Token Reducer integrates between EHR / FHIR servers and Clinical Decision Support (CDS) pipelines.
           </p>
         </div>
       </div>

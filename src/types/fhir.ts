@@ -78,11 +78,13 @@ export interface CompressionOptions {
   granularity?: GranularityMode;
   tokenBudget?: number; // e.g. 250, 500, 800, 1500 (0 for unlimited)
   safetySetGuaranteed?: boolean; // Always preserve allergies, active meds, critical abnormal values
-  stripMeta: boolean;
-  stripNarrativeText: boolean;
-  normalizeCodingSystems: boolean;
-  stripRedundantReferences: boolean;
-  stripCategory: boolean;
+  // The pipeline always applies these strips; the flags are accepted for
+  // backward compatibility and are not read by the optimizer.
+  stripMeta?: boolean;
+  stripNarrativeText?: boolean;
+  normalizeCodingSystems?: boolean;
+  stripRedundantReferences?: boolean;
+  stripCategory?: boolean;
   onlyAbnormalLabs?: boolean;
 }
 

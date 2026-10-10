@@ -135,7 +135,7 @@ async function startServer() {
   }
 
   app.listen(PORT, () => {
-    console.log(`ClinContext FHIR Engine listening on http://localhost:${PORT}`);
+    console.log(`namanfhirfold engine listening on http://localhost:${PORT}`);
   });
 }
 

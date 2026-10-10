@@ -2,7 +2,7 @@
 
 > **Fold the structure. Keep every detail.**
 
-`namanfhirfold` is an ultra-fast, zero-copy, task-aware FHIR R4 token compression engine in Rust. It shrinks massive EHR FHIR bundles by **85% to 94%** for LLMs, Clinical Decision Support (CDS Hooks), and RAG pipelines while strictly preserving 100% of clinical facts, units, codes, and numerical values.
+`namanfhirfold` is an ultra-fast, zero-copy, task-aware FHIR R4 token compression engine in Rust. It shrinks massive EHR FHIR bundles by **85% to 94%** for LLMs, Clinical Decision Support (CDS Hooks), and RAG pipelines while preserving clinical facts, units, codes, and numerical values in the retained safety set.
 
 ---
 
@@ -31,12 +31,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Optimized Tokens: {}", result.compressed_tokens);
     println!("Tokens Reduced: {}%", result.reduction_percentage);
-    println!("Clinical Facts Retained: {}/{}", result.retained_facts_count, result.total_facts_count);
+    println!("Clinical Facts Retained: {}/{}", result.preserved_facts_count, result.total_facts);
     println!("\nLLM Prompt Context:\n{}", result.compressed_output);
 
     Ok(())
 }
 ```
+
+---
+
+## 🔓 Decompression: `expand(ref)`
+
+Every fold emits a short reference per retained resource and stores the **full original
+resource** in `result.provenance_map`, so the round-trip is lossless.
+
+| Ref | Resource |
+|---|---|
+| `P1` | `Patient` (always one) |
+| `V1`, `V2`, … | Vital-sign `Observation` |
+| `O1`, `O2`, … | Other `Observation` (labs, etc.) |
+| `M1`, … | `Medication` / `MedicationRequest` |
+| `C1`, … | `Condition` |
+| `A1`, … | `AllergyIntolerance` |
+| `CP1`, … | `CarePlan` |
+
+```rust
+use namanfhirfold::{optimize, expand, expand_from_result, short_refs, CompressionOptions};
+
+let result = optimize(&fhir_bundle, &CompressionOptions::default())?;
+println!("{:?}", short_refs(&result)); // ["A1", "C1", "CP1", "M1", "O1", "P1", "V1"]
+
+// Preferred: O(1), no re-run of the optimizer
+let original: Option<serde_json::Value> = expand_from_result(&result, "O1");
+assert_eq!(original.unwrap()["id"], "obs-gluc");
+
+// One-shot convenience (re-runs the optimizer internally)
+let same = expand(&fhir_bundle, "O1");
+```
+
+> ⚠️ **Keep the map local.** The provenance map stores whole resources and can be as large as
+> your input bundle. Send only `result.compressed_output` to the LLM; expand refs from your own
+> process. Unknown refs return `None` instead of panicking.
 
 ---
 
