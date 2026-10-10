@@ -2,7 +2,14 @@ node_modules/
 build/
 dist/
 coverage/
+target/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
 .DS_Store
 *.log
+*.tgz
 .env*
 !.env.example

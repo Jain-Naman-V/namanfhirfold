@@ -205,7 +205,7 @@ This means you can deploy the repository directly to Vercel as a pure Vite proje
    git push origin main
    ```
 2. **Go to [Vercel Dashboard](https://vercel.com/new)** and click **"Add New... -> Project"**.
-3. **Select `namanscanbotesting/fhiroptimizer`** from your repository list.
+3. **Select `Jain-Naman-V/namanfhirfold`** from your repository list.
 4. **Vercel Settings**:
    - **Framework Preset**: `Vite` (automatically detected)
    - **Root Directory**: `./` (leave default)

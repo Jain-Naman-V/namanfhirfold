@@ -20,7 +20,7 @@ export const PackageHub: React.FC = () => {
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "keywords": ["fhir", "llm", "tokens", "compression", "healthcare", "cds-hooks", "medprompt", "fhirbench"],
-  "author": "Naman <naman@scanbo.com>",
+  "author": "Jain-Naman-V <namanvjain456@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,14 +28,14 @@ export const PackageHub: React.FC = () => {
   }
 }`;
 
-  const npmUsageCode = `import { foldFhir } from "namanfhirfold";
+  const npmUsageCode = `import { compressFhir } from "namanfhirfold";
 import { GoogleGenAI } from "@google/genai";
 
 // 1. Raw 10,000-token FHIR Bundle from EHR / SMART on FHIR
 const fhirBundle = await fetchPatientBundle(patientId);
 
 // 2. "Fold the structure. Keep every detail." — Compress by 85-94% before sending to LLM!
-const optimizedContext = foldFhir(fhirBundle, {
+const optimizedContext = compressFhir(fhirBundle, {
   format: "compact_json", // or "medprompt_text" | "markdown"
   profile: "vitals_monitor", // or "medication_prescribe" | "free_query"
   granularity: "exact_timestamp",
@@ -58,7 +58,7 @@ const response = await ai.models.generateContent({
 name = "namanfhirfold"
 version = "0.1.0"
 edition = "2021"
-authors = ["Naman <naman@scanbo.com>"]
+authors = ["Jain-Naman-V <namanvjain456@gmail.com>"]
 description = "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs"
 license = "MIT"
 readme = "README.md"

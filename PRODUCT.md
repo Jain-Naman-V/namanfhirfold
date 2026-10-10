@@ -20,10 +20,10 @@ Large Language Models (LLMs) possess extraordinary potential for clinical reason
 | Inpatient records exceed **25,000 tokens**. | Breaches strict hospital rate limits and **500ms CDS Hook timeout SLAs**. |
 
 ### The Positioning
-ClinContext is **not an end-user chatbot or EHR viewer**. It is a **foundational healthcare context optimization layer**. It is the missing pipeline piece between EHR FHIR repositories and clinical AI agents.
+namanfhirfold is **not an end-user chatbot or EHR viewer**. It is a **foundational healthcare context optimization layer**. It is the missing pipeline piece between EHR FHIR repositories and clinical AI agents.
 
 ```
-[EHR / SMART Repository]  ──▶  [ClinContext Optimizer]  ──▶  [CDS / LLM Agent]
+[EHR / SMART Repository]  ──▶  [namanfhirfold Optimizer]  ──▶  [CDS / LLM Agent]
    (Canonical Standard)           (Task-Aware Filter)          (Clean Reasoning)
 ```
 
@@ -33,22 +33,22 @@ ClinContext is **not an end-user chatbot or EHR viewer**. It is a **foundational
 
 ### Persona 1: Clinical AI / LLM Agent Engineers
 - **Need:** Providing patient history to OpenAI, Gemini, Anthropic, or open-source models without blowing context windows or budget.
-- **ClinContext Value:** Slashes input tokens by **85% to 94%** while guaranteeing **100% clinical fact preservation**.
+- **namanfhirfold Value:** Reduces input tokens by **85% to 94%** with a design goal of **100% clinical fact preservation** (the safety set is enforced in code; full-corpus validation is tracked in Phase 4).
 
 ### Persona 2: Hospital CDS Hooks Developers
 - **Need:** Building Clinical Decision Support (CDS) card services for Epic or Cerner Millennium. Hospital gateways require responses in **<500ms**.
-- **ClinContext Value:** Zero-copy Rust microservice delivers deterministic, sub-millisecond filtering (`<1.5ms`), ensuring compliance with strict EHR timeouts.
+- **namanfhirfold Value:** Zero-copy Rust microservice delivers deterministic, sub-millisecond filtering (`<1.5ms`), ensuring compliance with strict EHR timeouts.
 
 ### Persona 3: Healthcare RAG & Agentic Workflow Builders
 - **Need:** Grounding vector embeddings or AI agents without hallucinating or losing provenance back to the EHR.
-- **ClinContext Value:** Every output line contains a short reference (`O1`, `V1`, `CP1`) mapping back to the original FHIR resource ID, with on-demand `expand(ref)` support.
+- **namanfhirfold Value:** Every output line contains a short reference (`O1`, `V1`, `CP1`) mapping back to the original FHIR resource ID, with on-demand `expand(ref)` support.
 
 ---
 
 ## 3. Product Features & Differentiators
 
 ### Feature 1: The Clinical Triad Metric
-ClinContext rejects measuring token reduction in isolation. The product measures and enforces:
+namanfhirfold rejects measuring token reduction in isolation. The product measures and enforces:
 $$\text{Triad Metric} = \text{Input Token Reduction} + \text{Clinical Fact Retention (Fidelity \%)} + \text{Task Accuracy}$$
 
 ### Feature 2: Task-Aware Granularity
@@ -79,11 +79,11 @@ to inspect the raw canonical FHIR slice whenever in doubt.
 
 ## 4. Benchmark Matrix vs. Existing Approaches
 
-| Dimension | Raw FHIR JSON | FHIRBench (Markdown) | MEDPrompt (FHIR2Text) | ClinContext (`fhirctx`) |
+| Dimension | Raw FHIR JSON | FHIRBench (Markdown) | MEDPrompt (FHIR2Text) | namanfhirfold |
 |---|---|---|---|---|
 | **Input Tokens** | 4,200 (Baseline) | ~750 (-82%) | ~420 (-90%) | **~280 (-93.4%)** |
 | **Input Token Ratio** | 1.0× | ~5.6× fewer | ~10.0× fewer | **~15.0× fewer** |
-| **Fact Retention Rate** | 100% | 94% | 91% | **100% (Audited)** |
+| **Fact Retention Rate** | 100% | 94% | 91% | **100% (design goal)** |
 | **CarePlan Activities** | Verbose | Often dropped | Flattened | **Fully preserved** |
 | **Vitals vs Labs Distinction**| Mixed | Flat table | Bullets | **Strict semantic arrays** |
 | **Temporal Granularity** | Full ISO | Date only | Date only | **Selectable (Exact vs Date)** |
@@ -98,7 +98,7 @@ to inspect the raw canonical FHIR slice whenever in doubt.
 1. **Unit Invariance:** Never silently mutate or convert units of measure (e.g. `g/dL` remains `g/dL`).
 2. **Negation & Error Preservation:** Resources marked `entered-in-error` or `refuted` are never silently forwarded as true clinical findings.
 3. **No Silent Drops:** Omitted historical records always output an auditable notice: `## Omitted: N items → retrievable via expand(ref)`.
-4. **HIPAA & Zero-Data-Persistence:** ClinContext is a stateless transformation engine. In production deployments, zero patient records or PHI are persisted to disk or cloud storage.
+4. **HIPAA & Zero-Data-Persistence:** namanfhirfold is a stateless transformation engine. In production deployments, zero patient records or PHI are persisted to disk or cloud storage.
 
 ---
 
@@ -116,9 +116,9 @@ to inspect the raw canonical FHIR slice whenever in doubt.
 - [ ] Longitudinal trend collapse (e.g. `Hb: 13.5 → 12.1 → 11.0 ↓`).
 
 ### Phase 3: Integration & Distribution
-- [x] NPM package (`@clincontext/fhir-compress`).
-- [x] Rust crate (`fhir_compact` / `fhirctx`).
-- [x] Python package (`fhir-compress`).
+- [ ] NPM package (`namanfhirfold`) — source ready, publish pending.
+- [ ] Rust crate (`namanfhirfold`) — source ready, publish pending. Duplicate `fhir_compact` removed.
+- [ ] Python package (`namanfhirfold`) — source ready, publish pending.
 - [ ] Model Context Protocol (MCP) server distribution for Claude Desktop & Cursor.
 - [ ] Express / Fastify CDS Hooks reverse proxy middleware.
 

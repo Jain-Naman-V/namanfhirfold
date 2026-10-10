@@ -336,7 +336,7 @@ pub fn execute_optimization(
     let raw_tokens = (raw_fhir_json.len() as f32 / 3.8).round() as usize;
     let compressed_tokens = (compressed_output.len() as f32 / 3.8).round() as usize;
     let reduction_percentage = ((raw_tokens.saturating_sub(compressed_tokens)) as f32 / raw_tokens.max(1) as f32) * 100.0;
-    let token_multiple = (raw_tokens as f32 / compressed_tokens.max(1) as f32);
+    let token_multiple = raw_tokens as f32 / compressed_tokens.max(1) as f32;
 
     Ok(OptimizationResult {
         compressed_output,
