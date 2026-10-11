@@ -13,3 +13,5 @@ venv/
 *.tgz
 .env*
 !.env.example
+opencode.json
+
