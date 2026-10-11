@@ -54,9 +54,9 @@ class FoldOptions:
         safety_set_guaranteed: bool = True,
         query_filter: Optional[str] = None
     ):
-        self.format = str(format)
-        self.profile = str(profile)
-        self.granularity = str(granularity)
+        self.format = str(getattr(format, "value", format))
+        self.profile = str(getattr(profile, "value", profile))
+        self.granularity = str(getattr(granularity, "value", granularity))
         self.token_budget = token_budget
         self.safety_set_guaranteed = safety_set_guaranteed
         self.query_filter = query_filter
@@ -371,7 +371,7 @@ def fold_with_provenance(
         output_dict["observations"] = observations
     output_dict["_refs"] = sorted(provenance_map.keys())
 
-    fmt = str(format).lower()
+    fmt = (format.value if isinstance(format, CompressionFormat) else str(format)).lower()
     if fmt == "medprompt_text":
         lines = []
         if patient_summary:
