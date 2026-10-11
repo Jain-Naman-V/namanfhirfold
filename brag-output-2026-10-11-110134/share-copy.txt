@@ -1,0 +1,9 @@
+Announcing NamanFHIRFOLD
+
+Fold the structure. Keep every detail.
+
+NamanFHIRFOLD compresses FHIR bundles up to 99% for LLM prompts — while retaining 100% of clinical facts. Output formats: compact JSON, MedPrompt text, FHIRBench markdown, CDS Hooks prefetch.
+
+Try the live demo → https://github.com/Jain-Naman-V/namanfhirfold
+
+#FHIR #HealthTech #LLM #ClinicalAI #OpenSource

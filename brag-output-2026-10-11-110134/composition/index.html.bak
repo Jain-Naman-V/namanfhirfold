@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>NamanFHIRFOLD — Launch</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Inter";
+        src: url("assets/fonts/inter-var.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        src: url("assets/fonts/jetbrains-mono-var.woff2") format("woff2");
+        font-weight: 100 800;
+        font-style: normal;
+        font-display: block;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #030712;
+      }
+      body {
+        font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+        color: #f9fafb;
+        -webkit-font-smoothing: antialiased;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #030712;
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+      .anim { opacity: 0; }
+      .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+      /* ── ambient background ── */
+      #bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 90% 55% at 50% 38%, rgba(16, 185, 129, 0.09), transparent 62%),
+          radial-gradient(ellipse 55% 40% at 82% 82%, rgba(59, 130, 246, 0.05), transparent 55%),
+          radial-gradient(ellipse 40% 30% at 15% 75%, rgba(168, 85, 247, 0.04), transparent 50%),
+          #030712;
+      }
+      #bg-grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+        background-size: 72px 72px;
+        mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black 30%, transparent 75%);
+      }
+
+      /* ── Scene 1 — Hook ── */
+      #s1 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      #s1-eyebrow {
+        font-size: 30px;
+        font-weight: 500;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        margin-bottom: 28px;
+      }
+      #s1-title {
+        font-size: 148px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1;
+        color: #f9fafb;
+      }
+      #s1-title .fh { color: #34d399; }
+      #s1-byline {
+        margin-top: 30px;
+        font-size: 34px;
+        font-weight: 500;
+        color: #9ca3af;
+        letter-spacing: -0.01em;
+      }
+      #s1-byline .name { color: #f9fafb; font-weight: 600; }
+      #s1-problem {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      #s1-problem-num {
+        font-size: 172px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: #f9fafb;
+        line-height: 1;
+      }
+      #s1-problem-num .unit { color: #9ca3af; font-weight: 600; font-size: 88px; letter-spacing: -0.02em; }
+      #s1-problem-sub {
+        margin-top: 26px;
+        font-size: 40px;
+        font-weight: 500;
+        color: #9ca3af;
+        max-width: 1100px;
+        line-height: 1.35;
+      }
+      #s1-problem-sub .hl { color: #34d399; font-weight: 600; }
+
+      /* ── Scene 2 — Split Workbench ── */
+      #s2 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 80px 36px;
+      }
+      #s2-toolbar {
+        width: 1760px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 16px;
+        padding: 18px 28px;
+        margin-bottom: 22px;
+      }
+      #s2-toolbar .label { font-size: 22px; font-weight: 700; color: #9ca3af; margin-right: 14px; }
+      #s2-format-pill {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        font-weight: 500;
+        color: #34d399;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.28);
+        border-radius: 10px;
+        padding: 8px 16px;
+      }
+      #s2-profile-pill {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        font-weight: 500;
+        color: #c084fc;
+        background: rgba(168, 85, 247, 0.1);
+        border: 1px solid rgba(168, 85, 247, 0.28);
+        border-radius: 10px;
+        padding: 8px 16px;
+        margin-left: 14px;
+      }
+
+      #s2-bench {
+        width: 1760px;
+        display: grid;
+        grid-template-columns: 5fr 2.4fr 5fr;
+        gap: 20px;
+        align-items: stretch;
+      }
+      .panel {
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 18px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 560px;
+      }
+      .panel.out { border-color: rgba(16, 185, 129, 0.3); }
+      .panel-hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 22px;
+        border-bottom: 1px solid #1f2937;
+        background: rgba(255, 255, 255, 0.015);
+      }
+      .panel.out .panel-hd {
+        background: rgba(16, 185, 129, 0.07);
+        border-bottom-color: rgba(16, 185, 129, 0.2);
+      }
+      .panel-hd .ttl { display: flex; align-items: center; gap: 12px; }
+      .badge-num {
+        width: 38px; height: 38px;
+        border-radius: 10px;
+        display: grid; place-items: center;
+        font-size: 19px; font-weight: 800;
+        flex-shrink: 0;
+      }
+      .badge-num.in { background: rgba(244, 63, 94, 0.14); color: #fb7185; }
+      .badge-num.out { background: #10b981; color: #030712; }
+      .panel-hd h3 { font-size: 22px; font-weight: 700; color: #f9fafb; line-height: 1.25; }
+      .panel-hd .sub { font-size: 15px; color: #9ca3af; margin-top: 2px; }
+      .panel.out .panel-hd h3 { color: #d1fae5; }
+      .panel.out .panel-hd .sub { color: rgba(52, 211, 153, 0.75); font-style: italic; }
+      .tok-badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px; font-weight: 700;
+        border-radius: 10px;
+        padding: 8px 14px;
+        flex-shrink: 0;
+        margin-left: 14px;
+      }
+      .tok-badge.in { background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.22); }
+      .tok-badge.out { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+      .code-wrap { flex: 1; padding: 16px 20px; background: #0a0f18; overflow: hidden; }
+      .panel.out .code-wrap { background: #04120c; }
+      .code-wrap pre {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 19px;
+        line-height: 1.65;
+        color: #9ca3af;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .panel.out .code-wrap pre { color: #6ee7b7; }
+      .k { color: #93c5fd; }
+      .s { color: #fcd34d; }
+      .n { color: #c4b5fd; }
+      .c { color: #9ca3af; }
+
+      /* center gauge */
+      #s2-gauge {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+      }
+      #s2-gauge-card {
+        width: 100%;
+        background: rgba(16, 185, 129, 0.05);
+        border: 1px solid rgba(16, 185, 129, 0.28);
+        border-radius: 18px;
+        padding: 28px 22px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #s2-gauge-icon {
+        width: 64px; height: 64px;
+        border-radius: 50%;
+        background: #10b981;
+        display: grid; place-items: center;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 28px rgba(16, 185, 129, 0.35);
+      }
+      #s2-gauge-icon svg { width: 32px; height: 32px; }
+      #s2-gauge-pct {
+        font-size: 72px;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        color: #34d399;
+        line-height: 1;
+      }
+      #s2-gauge-lbl { font-size: 17px; font-weight: 700; color: #d1d5db; margin-top: 6px; text-align: center; }
+      #s2-gauge-rows {
+        width: 100%;
+        margin-top: 20px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(16, 185, 129, 0.18);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #s2-gauge-rows .row {
+        display: flex;
+        justify-content: space-between;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 17px;
+        color: #d1d5db;
+      }
+      #s2-gauge-rows .row .v { font-weight: 700; }
+      .v-rose { color: #fb7185; }
+      .v-em { color: #34d399; }
+      .v-blue { color: #60a5fa; }
+      #s2-ratio {
+        width: 100%;
+        margin-top: 14px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(59, 130, 246, 0.1);
+        font-size: 15px;
+        font-weight: 600;
+        color: #93c5fd;
+        text-align: center;
+      }
+
+      /* chips */
+      #s2-chips {
+        width: 1760px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        margin-top: 24px;
+        min-height: 58px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 21px;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: 12px 22px;
+        white-space: nowrap;
+      }
+      .chip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+      .chip.blue { background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); color: #93c5fd; }
+      .chip.blue .dot { background: #3b82f6; }
+      .chip.purple { background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); color: #d8b4fe; }
+      .chip.purple .dot { background: #a855f7; }
+      .chip.em { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #6ee7b7; }
+      .chip.em .dot { background: #10b981; }
+
+      #s2-retention {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 23px;
+        font-weight: 700;
+        color: #f0abfc;
+        background: rgba(217, 70, 239, 0.1);
+        border: 1px solid rgba(217, 70, 239, 0.3);
+        border-radius: 12px;
+        padding: 12px 22px;
+        margin-left: 10px;
+      }
+      #s2-retention .pct { color: #f9a8d4; font-family: "JetBrains Mono", monospace; }
+
+      /* ── Scene 3 — Output formats ── */
+      #s3 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 80px;
+      }
+      #s3-eyebrow {
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        margin-bottom: 18px;
+      }
+      #s3-title {
+        font-size: 64px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: #f9fafb;
+        margin-bottom: 52px;
+        text-align: center;
+      }
+      #s3-title .hl { color: #34d399; }
+      #s3-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 26px;
+        width: 1720px;
+      }
+      .fcard {
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 20px;
+        padding: 34px 30px 30px;
+        display: flex;
+        flex-direction: column;
+        min-height: 340px;
+      }
+      .fcard .fchip {
+        display: inline-flex;
+        align-self: flex-start;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        border-radius: 8px;
+        padding: 6px 12px;
+        margin-bottom: 18px;
+      }
+      .fcard.c1 .fchip { background: rgba(16, 185, 129, 0.12); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+      .fcard.c2 .fchip { background: rgba(59, 130, 246, 0.12); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+      .fcard.c3 .fchip { background: rgba(168, 85, 247, 0.12); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3); }
+      .fcard h4 { font-size: 34px; font-weight: 700; color: #f9fafb; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 10px; }
+      .fcard .desc { font-size: 19px; color: #d1d5db; line-height: 1.45; margin-bottom: 22px; flex: 1; }
+      .fcard .stats { display: flex; align-items: baseline; gap: 14px; border-top: 1px solid #1f2937; padding-top: 18px; }
+      .fcard .tok { font-family: "JetBrains Mono", monospace; font-size: 44px; font-weight: 700; color: #f9fafb; letter-spacing: -0.02em; }
+      .fcard .tok .u { font-size: 20px; color: #9ca3af; font-weight: 500; }
+      .fcard .red { font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 700; }
+      .fcard.c1 .red { color: #34d399; }
+      .fcard.c2 .red { color: #60a5fa; }
+      .fcard.c3 .red { color: #c084fc; }
+      #s3-footer {
+        margin-top: 34px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 22px;
+        color: #d1d5db;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 14px 28px;
+      }
+      #s3-footer .hl { color: #34d399; font-weight: 600; }
+
+      /* ── Scene 4 — Punchline ── */
+      #s4 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      #s4-eyebrow {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        margin-bottom: 30px;
+      }
+      #s4-chips {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 48px;
+      }
+      #s4-chips .fchip {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        font-weight: 600;
+        color: #d1d5db;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 12px 18px;
+      }
+      #s4-tag {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      #tag1, #tag2 {
+        font-size: 92px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1.15;
+        color: #f9fafb;
+      }
+      #tag1 .hl, #tag2 .hl { color: #34d399; }
+      #tag2 { margin-top: 8px; }
+      #s4-lockup {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      #lockup-mark {
+        font-size: 110px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        color: #f9fafb;
+        line-height: 1;
+      }
+      #lockup-mark .fh { color: #34d399; }
+      #lockup-tag {
+        margin-top: 22px;
+        font-size: 32px;
+        font-weight: 500;
+        color: #9ca3af;
+        letter-spacing: -0.01em;
+      }
+      #lockup-url {
+        margin-top: 34px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 24px;
+        font-weight: 500;
+        color: #d1d5db;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 14px 26px;
+      }
+      #lockup-url .hl { color: #34d399; }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="24.23"
+      data-width="1920"
+      data-height="1080"
+      data-fps="30"
+    >
+      <div id="bg"></div>
+      <div id="bg-grid"></div>
+
+      <!-- ═══ Scene 1 · Hook ═══ -->
+      <section id="s1" class="clip" data-start="0" data-duration="5.80" data-track-index="0">
+        <div id="s1-intro">
+          <div id="s1-eyebrow" class="anim">Presenting you</div>
+          <h1 id="s1-title" class="anim">Naman<span class="fh">FHIR</span>FOLD</h1>
+          <div id="s1-byline" class="anim">developed by <span class="name">Naman Jain</span></div>
+        </div>
+        <div id="s1-problem">
+          <div id="s1-problem-num" class="anim">1,483<span class="unit"> tokens</span></div>
+          <div id="s1-problem-sub" class="anim">
+            for a <span class="hl">single SpO&#8322; reading</span> buried in raw FHIR noise
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ Scene 2 · Split Workbench ═══ -->
+      <section id="s2" class="clip" data-start="5.80" data-duration="6.85" data-track-index="0">
+        <div id="s2-toolbar" class="anim">
+          <div style="display: flex; align-items: center;">
+            <span class="label">Format:</span>
+            <span id="s2-format-pill">compact_json</span>
+            <span id="s2-profile-pill">vitals_monitor</span>
+          </div>
+          <div class="mono" style="font-size: 19px; color: #9ca3af;">
+            granularity: exact_timestamp &nbsp;·&nbsp; budget: 800 tok
+          </div>
+        </div>
+
+        <div id="s2-bench">
+          <!-- LEFT · input -->
+          <div id="s2-left" class="panel anim">
+            <div class="panel-hd">
+              <div class="ttl">
+                <div class="badge-num in">1</div>
+                <div>
+                  <h3>INPUT · Raw FHIR Bundle</h3>
+                  <div class="sub">Canonical EHR source of truth</div>
+                </div>
+              </div>
+              <div class="tok-badge in">1,483 tok</div>
+            </div>
+            <div class="code-wrap">
+              <pre><span class="k">"resourceType"</span>: <span class="s">"Observation"</span>,
+<span class="k">"meta"</span>: {
+  <span class="k">"profile"</span>: [<span class="s">"…/vitals"</span>],
+  <span class="k">"versionId"</span>: <span class="s">"1"</span>,
+  <span class="k">"lastUpdated"</span>: <span class="s">"2018-11-13…"</span>
+},
+<span class="k">"status"</span>: <span class="s">"final"</span>,
+<span class="k">"code"</span>: { <span class="k">"coding"</span>: [{
+  <span class="k">"system"</span>: <span class="s">"http://loinc.org"</span>,
+  <span class="k">"code"</span>: <span class="s">"2708-6"</span>,
+  <span class="k">"display"</span>: <span class="s">"Oxygen saturation…"</span>
+}]},
+<span class="k">"subject"</span>: { <span class="k">"reference"</span>: <span class="s">"Patient/…"</span> },
+<span class="k">"effectiveDateTime"</span>: <span class="s">"2018-11-13T17:59:02-05:00"</span>,
+<span class="k">"valueQuantity"</span>: { <span class="k">"value"</span>: <span class="n">88</span> },
+<span class="k">"extension"</span>: [ <span class="c">/* MDC coding, search.mode… */</span> ],
+<span class="c">// … meta, text.div, systems, wrapper</span></pre>
+            </div>
+          </div>
+
+          <!-- CENTER · gauge -->
+          <div id="s2-gauge" class="anim">
+            <div id="s2-gauge-card">
+              <div id="s2-gauge-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#030712" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                  <polyline points="17 18 23 18 23 12"></polyline>
+                </svg>
+              </div>
+              <div id="s2-gauge-pct">&minus;95%</div>
+              <div id="s2-gauge-lbl">Input-token reduction</div>
+              <div id="s2-gauge-rows">
+                <div class="row"><span>Before:</span><span class="v v-rose">1,483</span></div>
+                <div class="row"><span>After:</span><span class="v v-em">67</span></div>
+                <div class="row"><span>Spared:</span><span class="v v-blue">1,416 tok</span></div>
+              </div>
+              <div id="s2-ratio">22.1&times; fewer input tokens</div>
+            </div>
+          </div>
+
+          <!-- RIGHT · output -->
+          <div id="s2-right" class="panel out anim">
+            <div class="panel-hd">
+              <div class="ttl">
+                <div class="badge-num out">2</div>
+                <div>
+                  <h3>OUTPUT · <span class="mono" style="color: #34d399;">namanfhirfold</span> context</h3>
+                  <div class="sub">Fold the structure. Keep every detail.</div>
+                </div>
+              </div>
+              <div class="tok-badge out">67 tok</div>
+            </div>
+            <div class="code-wrap">
+              <pre>{
+  <span class="k">"V1"</span>: {
+    <span class="k">"t"</span>:  <span class="s">"in-alarm"</span>,
+    <span class="k">"ts"</span>: <span class="s">"2018-11-13T17:59:02-05:00"</span>,
+    <span class="k">"loinc"</span>: <span class="s">"2708-6"</span>,
+    <span class="k">"mdc"</span>: <span class="s">"MDC_PULS_OXIM_SAT_O2"</span>,
+    <span class="k">"v"</span>:   <span class="n">88</span>,
+    <span class="k">"unit"</span>: <span class="s">"%"</span>
+  }
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div id="s2-chips">
+          <span id="chip1" class="chip blue anim"><span class="dot"></span>in-alarm</span>
+          <span id="chip2" class="chip purple anim"><span class="dot"></span>2018-11-13T17:59:02-05:00</span>
+          <span id="chip3" class="chip em anim"><span class="dot"></span>LOINC 2708-6 · MDC kept</span>
+          <span id="s2-retention" class="anim">100% fact retention <span class="pct">(2/2)</span></span>
+        </div>
+      </section>
+
+      <!-- ═══ Scene 3 · Output formats ═══ -->
+      <section id="s3" class="clip" data-start="12.65" data-duration="5.79" data-track-index="0">
+        <div id="s3-eyebrow" class="anim">One fold &middot; four targets</div>
+        <h2 id="s3-title" class="anim">Optimized for <span class="hl">every</span> LLM workflow</h2>
+
+        <div id="s3-cards">
+          <div id="fmt1" class="fcard c1 anim">
+            <span class="fchip">compact_json</span>
+            <h4>Clinical JSON</h4>
+            <p class="desc">Flat observation map with provenance IDs. Default for agents and CDS Hooks.</p>
+            <div class="stats">
+              <span class="tok">67<span class="u"> tok</span></span>
+              <span class="red">&minus;95%</span>
+            </div>
+          </div>
+          <div id="fmt2" class="fcard c2 anim">
+            <span class="fchip">medprompt_text</span>
+            <h4>MedPrompt Text</h4>
+            <p class="desc">Pipe-delimited shorthand built for GPT-style prompt chains and few-shot runs.</p>
+            <div class="stats">
+              <span class="tok">22<span class="u"> tok</span></span>
+              <span class="red">&minus;99%</span>
+            </div>
+          </div>
+          <div id="fmt3" class="fcard c3 anim">
+            <span class="fchip">fhirbench_markdown</span>
+            <h4>FHIRBench Markdown</h4>
+            <p class="desc">Clean markdown tables for FHIRBench-style evaluation harnesses.</p>
+            <div class="stats">
+              <span class="tok">49<span class="u"> tok</span></span>
+              <span class="red">&minus;97%</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="s3-footer" class="anim">
+          also <span class="hl">cds_hooks_prefetch</span> &mdash; 157 tok &middot; &minus;89%
+        </div>
+      </section>
+
+      <!-- ═══ Scene 4 · Punchline ═══ -->
+      <section id="s4" class="clip" data-start="18.44" data-duration="5.79" data-track-index="0">
+        <div id="s4-formats">
+          <div id="s4-eyebrow" class="anim">The output</div>
+          <div id="s4-chips">
+            <span id="fchip1" class="fchip anim">compact_json</span>
+            <span id="fchip2" class="fchip anim">medprompt_text</span>
+            <span id="fchip3" class="fchip anim">fhirbench_markdown</span>
+            <span id="fchip4" class="fchip anim">cds_hooks_prefetch</span>
+          </div>
+        </div>
+        <div id="s4-tag" data-layout-allow-overlap>
+          <div id="tag1" class="anim" data-layout-allow-overlap>Fold the <span class="hl">structure</span>.</div>
+          <div id="tag2" class="anim">Keep every <span class="hl">detail</span>.</div>
+        </div>
+        <div id="s4-lockup" data-layout-allow-overlap>
+          <div id="lockup-mark" class="anim" data-layout-allow-overlap>Naman<span class="fh">FHIR</span>FOLD</div>
+          <div id="lockup-tag" class="anim">Clinical FHIR &rarr; LLM context, losslessly</div>
+          <div id="lockup-url" class="anim">github.com/<span class="hl">Jain-Naman-V</span>/namanfhirfold</div>
+        </div>
+      </section>
+
+      <!-- ═══ Audio ═══ -->
+      <audio
+        id="bgm"
+        src="assets/music/bgm.wav"
+        data-start="0"
+        data-duration="24.23"
+        data-track-index="9"
+        data-volume="0.62"
+        data-automation="{&quot;version&quot;:1,&quot;lanes&quot;:[{&quot;target&quot;:&quot;volume&quot;,&quot;points&quot;:[{&quot;t&quot;:0,&quot;v&quot;:0},{&quot;t&quot;:0.6,&quot;v&quot;:0.62},{&quot;t&quot;:22.73,&quot;v&quot;:0.62},{&quot;t&quot;:24.23,&quot;v&quot;:0}]}]}"
+      ></audio>
+
+      <audio id="sfx-wm"     src="assets/sfx/rollover2.wav"             data-start="1.60"  data-duration="0.06" data-track-index="1" data-volume="0.5"></audio>
+      <audio id="sfx-prob"   src="assets/sfx/rollover2.wav"             data-start="3.70"  data-duration="0.06" data-track-index="1" data-volume="0.55"></audio>
+      <audio id="sfx-t1"     src="assets/sfx/impactSoft_medium_001.wav" data-start="5.80"  data-duration="0.18" data-track-index="1" data-volume="0.85"></audio>
+      <audio id="sfx-chip1"  src="assets/sfx/click_003.wav"             data-start="9.50"  data-duration="0.01" data-track-index="1" data-volume="0.7"></audio>
+      <audio id="sfx-chip2"  src="assets/sfx/click_003.wav"             data-start="10.54" data-duration="0.01" data-track-index="1" data-volume="0.7"></audio>
+      <audio id="sfx-chip3"  src="assets/sfx/click_003.wav"             data-start="11.60" data-duration="0.01" data-track-index="1" data-volume="0.7"></audio>
+      <audio id="sfx-bong"   src="assets/sfx/bong_001.wav"              data-start="12.12" data-duration="0.12" data-track-index="1" data-volume="0.8"></audio>
+      <audio id="sfx-t2"     src="assets/sfx/impactSoft_medium_002.wav" data-start="12.65" data-duration="0.14" data-track-index="1" data-volume="0.85"></audio>
+      <audio id="sfx-card1"  src="assets/sfx/card-slide-1.wav"          data-start="13.18" data-duration="0.40" data-track-index="1" data-volume="0.65"></audio>
+      <audio id="sfx-card2"  src="assets/sfx/card-slide-1.wav"          data-start="14.22" data-duration="0.40" data-track-index="1" data-volume="0.65"></audio>
+      <audio id="sfx-card3"  src="assets/sfx/card-slide-1.wav"          data-start="15.28" data-duration="0.40" data-track-index="1" data-volume="0.65"></audio>
+      <audio id="sfx-foot"   src="assets/sfx/rollover2.wav"             data-start="16.34" data-duration="0.06" data-track-index="1" data-volume="0.55"></audio>
+      <audio id="sfx-t3"     src="assets/sfx/impactSoft_medium_003.wav" data-start="18.44" data-duration="0.14" data-track-index="1" data-volume="0.85"></audio>
+      <audio id="sfx-lock"   src="assets/sfx/impactBell_heavy_003.wav"  data-start="22.65" data-duration="0.65" data-track-index="1" data-volume="0.9"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      /* ═════ Scene 1 · 0.00 → 5.80 ═════ */
+      tl.fromTo("#s1-eyebrow",
+        { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.20);
+      tl.fromTo("#s1-title",
+        { opacity: 0, scale: 0.93 },
+        { opacity: 1, scale: 1, duration: 0.85, ease: "power3.out" }, 0.85);
+      tl.fromTo("#s1-byline",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 2.10);
+
+      // problem reveal on strong beat 3.70
+      tl.to("#s1-eyebrow", { opacity: 0, y: -18, duration: 0.35 }, 3.70);
+      tl.to("#s1-title",   { opacity: 0, y: -24, duration: 0.35 }, 3.74);
+      tl.to("#s1-byline",  { opacity: 0, y: -18, duration: 0.35 }, 3.74);
+      tl.fromTo("#s1-problem-num",
+        { opacity: 0, y: 32, scale: 0.96 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "power3.out" }, 3.92);
+      tl.fromTo("#s1-problem-sub",
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 4.20);
+
+      /* ═════ Scene 2 · 5.80 → 12.65 ═════ */
+      tl.fromTo("#s2-toolbar",
+        { opacity: 0, y: -16 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 5.95);
+      tl.fromTo("#s2-left",
+        { opacity: 0, x: -36 },
+        { opacity: 1, x: 0, duration: 0.65, ease: "power3.out" }, 6.05);
+      tl.fromTo("#s2-right",
+        { opacity: 0, x: 36 },
+        { opacity: 1, x: 0, duration: 0.65, ease: "power3.out" }, 6.12);
+      tl.fromTo("#s2-gauge",
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 6.34);
+
+      // retention chips on sequential beats
+      tl.fromTo("#chip1",
+        { opacity: 0, y: 18, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 9.50);
+      tl.fromTo("#chip2",
+        { opacity: 0, y: 18, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 10.54);
+      tl.fromTo("#chip3",
+        { opacity: 0, y: 18, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 11.60);
+      tl.fromTo("#s2-retention",
+        { opacity: 0, scale: 0.82 },
+        { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 12.12);
+
+      /* ═════ Scene 3 · 12.65 → 18.44 ═════ */
+      tl.fromTo("#s3-eyebrow",
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 12.80);
+      tl.fromTo("#s3-title",
+        { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 12.92);
+      tl.fromTo("#fmt1",
+        { opacity: 0, y: 36 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 13.18);
+      tl.fromTo("#fmt2",
+        { opacity: 0, y: 36 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 14.22);
+      tl.fromTo("#fmt3",
+        { opacity: 0, y: 36 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 15.28);
+      tl.fromTo("#s3-footer",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 16.34);
+
+      /* ═════ Scene 4 · 18.44 → 24.23 ═════ */
+      tl.fromTo("#s4-eyebrow",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 18.60);
+
+      // four format chips expand 18.96 → 19.9
+      tl.fromTo("#fchip1",
+        { opacity: 0, y: 14, scale: 0.93 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "power2.out" }, 18.96);
+      tl.fromTo("#fchip2",
+        { opacity: 0, y: 14, scale: 0.93 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "power2.out" }, 19.18);
+      tl.fromTo("#fchip3",
+        { opacity: 0, y: 14, scale: 0.93 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "power2.out" }, 19.40);
+      tl.fromTo("#fchip4",
+        { opacity: 0, y: 14, scale: 0.93 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "power2.out" }, 19.62);
+
+      // chips clear for the tagline
+      tl.to("#s4-formats", { opacity: 0, y: -14, duration: 0.4, ease: "power2.in" }, 20.14);
+
+      // tagline halves on beats
+      tl.fromTo("#tag1",
+        { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 20.54);
+      tl.fromTo("#tag2",
+        { opacity: 0, y: 26 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 21.59);
+
+      // final lockup on strong beat 22.65
+      tl.to("#s4-tag", { opacity: 0, y: -18, duration: 0.4, ease: "power2.in" }, 22.65);
+      tl.fromTo("#lockup-mark",
+        { opacity: 0, scale: 0.94 },
+        { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" }, 22.72);
+      tl.fromTo("#lockup-tag",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 23.05);
+      tl.fromTo("#lockup-url",
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 23.30);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
