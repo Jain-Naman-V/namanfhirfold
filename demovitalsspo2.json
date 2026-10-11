@@ -1,0 +1,103 @@
+{
+  "resourceType" : "Observation",
+  "id" : "numeric-spo2-alarm",
+  "meta" : {
+    "profile" : ["http://hl7.org/fhir/uv/phd/StructureDefinition/PhdNumericObservation"]
+  },
+  "language" : "en",
+  "text" : {
+    "status" : "extensions",
+    "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p class=\"res-header-id\"><b>Generated Narrative: Observation numeric-spo2-alarm</b></p><a name=\"numeric-spo2-alarm\"> </a><a name=\"hcnumeric-spo2-alarm\"> </a><div style=\"display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%\"><p style=\"margin-bottom: 0px\"/><p style=\"margin-bottom: 0px\">Profile: <a href=\"StructureDefinition-PhdNumericObservation.html\">PhdNumericObservation</a></p></div><p><b>Device Gateway</b>: <a href=\"Device-phg-ecde3d4e58532d31.000000000000.html\">Device: identifier = IEEE 11073 System Identifier,Bluetooth MAC address,Ethernet MAC address; type = MDC_MOC_VMS_MDS_AHD</a></p><p><b>Coincident Timestamp Reference</b>: <a href=\"Observation-coin-20181119202022.html\">Observation MDC_ATTR_TIME_ABS</a></p><p><b>identifier</b>: <code>http://hl7.org/fhir/uv/phd/StructureDefinition/PhdBaseObservation</code>/74E8FFFEFF051C00-sisansarahId-urn:oid:2.999.1.2.3.4.5.6.7.8.10-149530-20181113175902.00-150588</p><p><b>status</b>: Final</p><p><b>category</b>: <span title=\"Codes:{http://terminology.hl7.org/CodeSystem/observation-category vital-signs}\">Vital Signs</span>, <span title=\"Codes:{http://hl7.org/fhir/uv/phd/CodeSystem/PhdObservationCategories phd}\">PHD generated Observation</span>, <span title=\"Codes:{http://loinc.org 2708-6}\">Oxygen saturation in Arterial blood</span></p><p><b>code</b>: <span title=\"Codes:{urn:iso:std:iso:11073:10101 150456}, {http://loinc.org 2708-6}\">MDC_PULS_OXIM_SAT_O2</span></p><p><b>subject</b>: <a href=\"Patient-patientExample-1.html\">Sisansarah Lorianthah Piggy  (no stated gender), DoB Unknown ( Medical record number)</a></p><p><b>effective</b>: 2018-11-13 17:59:02-0500</p><p><b>performer</b>: <a href=\"Patient-patientExample-1.html\">Sisansarah Lorianthah Piggy  (no stated gender), DoB Unknown ( Medical record number)</a></p><p><b>value</b>: 79.0 %<span style=\"background: LightGoldenRodYellow\"> (Details: UCUM  code% = '%')</span></p><p><b>interpretation</b>: <span title=\"Codes:{http://hl7.org/fhir/uv/pocd/CodeSystem/measurement-status in-alarm}\">Measurement in alarm</span></p><p><b>device</b>: <a href=\"Device-phd-74E8FFFEFF051C00.001C05FFE874.html\">Device: identifier = IEEE 11073 System Identifier: 74-E8-FF-FE-FF-05-1C-00,Bluetooth MAC address: Bluetooth Address as a device identifier#00-1C-05-FF-E8-74; manufacturer = Nonin_Medical_Inc.; serialNumber = 501900083; modelNumber = Model 3230; type = MDC_MOC_VMS_MDS_SIMP,MDC_DEV_SPEC_PROFILE_PULS_OXIM</a></p><h3>Components</h3><table class=\"grid\"><tr><td style=\"display: none\">-</td><td><b>Code</b></td><td><b>Value[x]</b></td></tr><tr><td style=\"display: none\">*</td><td><span title=\"Codes:{urn:iso:std:iso:11073:10101 68193}\">Supplemental information</span></td><td><span title=\"Codes:{urn:iso:std:iso:11073:10101 150588}\">Stable mean</span></td></tr></table></div>"
+  },
+  "extension" : [{
+    "url" : "http://hl7.org/fhir/StructureDefinition/device-gateway",
+    "valueCodeableReference" : {
+      "reference" : {
+        "reference" : "Device/phg-ecde3d4e58532d31.000000000000"
+      }
+    }
+  },
+  {
+    "url" : "http://hl7.org/fhir/uv/phd/StructureDefinition/CoincidentTimeStampReference",
+    "valueReference" : {
+      "reference" : "Observation/coin-20181119202022"
+    }
+  }],
+  "identifier" : [{
+    "system" : "http://hl7.org/fhir/uv/phd/StructureDefinition/PhdBaseObservation",
+    "value" : "74E8FFFEFF051C00-sisansarahId-urn:oid:2.999.1.2.3.4.5.6.7.8.10-149530-20181113175902.00-150588"
+  }],
+  "status" : "final",
+  "category" : [{
+    "coding" : [{
+      "system" : "http://terminology.hl7.org/CodeSystem/observation-category",
+      "code" : "vital-signs"
+    }],
+    "text" : "Vital Signs"
+  },
+  {
+    "coding" : [{
+      "system" : "http://hl7.org/fhir/uv/phd/CodeSystem/PhdObservationCategories",
+      "code" : "phd"
+    }]
+  },
+  {
+    "coding" : [{
+      "system" : "http://loinc.org",
+      "code" : "2708-6"
+    }]
+  }],
+  "code" : {
+    "coding" : [{
+      "system" : "urn:iso:std:iso:11073:10101",
+      "code" : "150456",
+      "display" : "MDC_PULS_OXIM_SAT_O2"
+    },
+    {
+      "system" : "http://loinc.org",
+      "code" : "2708-6",
+      "display" : "Oxygen saturation in Arterial blood"
+    }]
+  },
+  "subject" : {
+    "reference" : "Patient/patientExample-1"
+  },
+  "effectiveDateTime" : "2018-11-13T17:59:02-05:00",
+  "performer" : [{
+    "reference" : "Patient/patientExample-1"
+  }],
+  "valueQuantity" : {
+    "value" : 79.0,
+    "unit" : "%",
+    "system" : "http://unitsofmeasure.org",
+    "code" : "%"
+  },
+  "interpretation" : [{
+    "coding" : [{
+      "system" : "http://hl7.org/fhir/uv/pocd/CodeSystem/measurement-status",
+      "code" : "in-alarm",
+      "display" : "Measurement in alarm"
+    }]
+  }],
+  "device" : {
+    "reference" : "Device/phd-74E8FFFEFF051C00.001C05FFE874"
+  },
+  "component" : [{
+    "code" : {
+      "coding" : [{
+        "system" : "urn:iso:std:iso:11073:10101",
+        "code" : "68193",
+        "display" : "MDC_ATTR_SUPPLEMENTAL_TYPES"
+      }],
+      "text" : "Supplemental information"
+    },
+    "valueCodeableConcept" : {
+      "coding" : [{
+        "system" : "urn:iso:std:iso:11073:10101",
+        "code" : "150588",
+        "display" : "MDC_MODALITY_SPOT"
+      }],
+      "text" : "Stable mean"
+    }
+  }]
+}
