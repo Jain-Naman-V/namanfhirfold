@@ -13,7 +13,9 @@
 > **"Fold the structure. Keep every detail."**  
 > *Clear purpose, memorable, and immediately recognizable to healthcare developers.*
 
-🎬 **[Watch the 24-second launch video](brag-output-2026-10-11-110134/brag.mp4)** — see how namanfhirfold folds a raw FHIR bundle into a 67-token LLM-ready payload in real time.
+ See how namanfhirfold folds a raw FHIR bundle into a 67-token LLM-ready payload in real time.
+
+ https://github.com/user-attachments/assets/9ceb03de-98ac-41f5-b272-58a7d4d71893
 
 `namanfhirfold` is an ultra-fast, zero-copy healthcare context optimization engine designed to bridge the gap between verbose electronic health record (EHR) FHIR repositories and large language model (LLM) agents, clinical decision support (CDS) hooks, and retrieval-augmented generation (RAG) pipelines. Available as a **Rust crate (`crates/namanfhirfold`)**, **NPM package (`packages/namanfhirfold`)**, and **Python package (`python/namanfhirfold`)**.
 
