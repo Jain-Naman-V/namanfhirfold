@@ -15,3 +15,6 @@ venv/
 !.env.example
 opencode.json
 
+
+# HyperFrames launch-video output (22 MB artifacts - do not commit)
+brag-output-*/
