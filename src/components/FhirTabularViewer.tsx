@@ -70,6 +70,18 @@ export const FhirTabularViewer: React.FC<FhirTabularViewerProps> = ({
       });
     } else if (parsed.resourceType) {
       resources.push(parsed);
+    } else if (parsed && typeof parsed === "object") {
+      // Grouped export (no top-level resourceType): { Patient: {...}, Conditions: {Bundle}, ... }
+      Object.values(parsed).forEach((val: any) => {
+        if (!val || typeof val !== "object" || Array.isArray(val)) return;
+        if (val.resourceType === "Bundle" && Array.isArray(val.entry)) {
+          val.entry.forEach((e: any) => {
+            if (e?.resource) resources.push(e.resource);
+          });
+        } else if (val.resourceType) {
+          resources.push(val);
+        }
+      });
     }
 
     const rows: FlattenedRow[] = [];

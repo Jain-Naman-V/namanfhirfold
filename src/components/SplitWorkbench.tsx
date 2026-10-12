@@ -390,6 +390,10 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
             <textarea
               value={rawJsonText}
               onChange={(e) => setRawJsonText(e.target.value)}
+              onPaste={() => {
+                // Pasted payload replaces the sample — sample query no longer applies.
+                if (queryFilter) setQueryFilter("");
+              }}
               className="w-full h-full min-h-[440px] p-2.5 font-mono text-xs bg-transparent text-gray-200 border-0 focus:outline-none resize-none leading-relaxed"
               placeholder="Paste raw FHIR JSON bundle here..."
               spellCheck={false}

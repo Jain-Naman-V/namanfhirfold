@@ -145,6 +145,25 @@ export function compressFhir(
   } else if (parsed.resourceType) {
     rawResources.push(parsed);
     resourceTypeCount[parsed.resourceType] = 1;
+  } else if (parsed && typeof parsed === "object") {
+    // Grouped export with no top-level resourceType:
+    // { "Patient": {...}, "Conditions": {Bundle}, "Observations": {error}, ... }
+    Object.values(parsed).forEach((val: any) => {
+      if (!val || typeof val !== "object" || Array.isArray(val)) return;
+      if (val.resourceType === "Bundle" && Array.isArray(val.entry)) {
+        val.entry.forEach((entry: any) => {
+          if (entry?.resource) {
+            rawResources.push(entry.resource);
+            const rt = entry.resource.resourceType || "Unknown";
+            resourceTypeCount[rt] = (resourceTypeCount[rt] || 0) + 1;
+          }
+        });
+      } else if (val.resourceType) {
+        rawResources.push(val);
+        resourceTypeCount[val.resourceType] = (resourceTypeCount[val.resourceType] || 0) + 1;
+      }
+      // error stubs like {error: "...", status: 400} have no resourceType — skipped
+    });
   }
 
   // Determine Granularity (if query asks for specific time, auto-upgrade to exact_timestamp)
@@ -277,12 +296,21 @@ export function compressFhir(
         } else if (res.valueString) {
           val = res.valueString;
         } else if (res.component && Array.isArray(res.component)) {
-          const comps = res.component.map((c: any) => {
-            const cName = extractConcept(c.code).name;
-            const cVal = c.valueQuantity?.value;
-            const cUnit = c.valueQuantity?.unit || "";
-            return `${cName}: ${cVal} ${cUnit}`.trim();
-          });
+          const comps = res.component
+            .filter((c: any) => !(typeof c.valueString === "string" && c.valueString.length > 100))
+            .map((c: any) => {
+              const cName = extractConcept(c.code).name;
+              const cVal =
+                c.valueQuantity?.value ??
+                c.valueString ??
+                c.valueInteger ??
+                c.valueBoolean ??
+                (c.valueCodeableConcept ? extractConcept(c.valueCodeableConcept).name : undefined);
+              const cUnit = c.valueQuantity?.unit || "";
+              if (cVal === undefined) return null;
+              return `${cName}: ${cVal} ${cUnit}`.trim();
+            })
+            .filter(Boolean);
           val = comps.join(", ");
         }
 
@@ -481,7 +509,7 @@ export function compressFhir(
   const omittedCount = Math.max(0, validResources.length - selectedResources.length);
   let omittedNotice: string | undefined = undefined;
   if (omittedCount > 0) {
-    omittedNotice = `## Omitted: ${omittedCount} older/non-pertinent items → retrievable via expand(ref)`;
+    omittedNotice = `## Omitted: ${omittedCount} items not matching query/profile filter → clear query to include all, or retrievable via expand(ref)`;
   }
 
   // 6. Build target representation
@@ -500,7 +528,7 @@ export function compressFhir(
     if (conditions.length > 0) compactObj.conditions = conditions;
     if (medications.length > 0) compactObj.medications = medications;
     if (others.length > 0) compactObj.other = others;
-    if (omittedNotice) compactObj._omitted = `${omittedCount} items omitted by budget (call expand(ref) to retrieve)`;
+    if (omittedNotice) compactObj._omitted = `${omittedCount} items omitted by query/profile filter, not token budget (clear query to include all, or call expand(ref))`;
 
     compressedOutput = JSON.stringify(compactObj, null, 2);
   } else if (options.format === "medprompt_text") {
