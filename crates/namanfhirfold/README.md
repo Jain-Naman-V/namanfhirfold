@@ -1,8 +1,15 @@
 # namanfhirfold 🦀
 
-> **Fold the structure. Keep every detail.**
+> **Optimize clinical context for fewer tokens.**
 
-`namanfhirfold` is an ultra-fast, zero-copy, task-aware FHIR R4 token compression engine in Rust. It shrinks massive EHR FHIR bundles by **85% to 94%** for LLMs, Clinical Decision Support (CDS Hooks), and RAG pipelines while preserving clinical facts, units, codes, and numerical values in the retained safety set.
+`namanfhirfold` is a task-aware FHIR R4 clinical-context and token optimization SDK in Rust. It converts verbose EHR bundles into compact context for LLMs, CDS Hooks, and RAG pipelines while reporting what was retained, omitted, or limited by the selected budget.
+
+### Input and output
+
+- Input: a FHIR R4 resource or Bundle as a JSON `&str`.
+- Output: `OptimizationResult`, containing compact output, token metrics, omission metadata, and an in-process provenance map.
+- Formats: compact JSON, MedPrompt text, FHIRBench Markdown, and CDS Hooks prefetch.
+- `token_budget: None` means unlimited selection; a positive budget prioritizes safety resources and reports overflow/omissions.
 
 ---
 
@@ -13,7 +20,7 @@ Typical FHIR JSON payloads waste 70–90% of token budgets on nested JSON scaffo
 - Deep narrative HTML duplication (`text.div`)
 - Redundant subject/encounter cross-references repeated across dozens of observations
 
-`namanfhirfold` strips structural bloat and retains critical clinical semantics with sub-millisecond execution.
+`namanfhirfold` reduces structural bloat and retains the supported clinical semantics; benchmark latency depends on input size and deployment.
 
 ```rust
 use namanfhirfold::{optimize, CompressionOptions, CdsProfile, Granularity};
@@ -42,8 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🔓 Decompression: `expand(ref)`
 
-Every fold emits a short reference per retained resource and stores the **full original
-resource** in `result.provenance_map`, so the round-trip is lossless.
+Every fold emits a short reference per retained resource and stores the original resource
+in `result.provenance_map` for trusted local expansion. The compact output remains a
+task-aware representation; the canonical FHIR resource is still authoritative.
 
 | Ref | Resource |
 |---|---|

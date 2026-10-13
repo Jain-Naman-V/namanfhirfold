@@ -276,20 +276,28 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           <div>
             <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1 flex justify-between">
               <span>Token Budget:</span>
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{tokenBudget} tok max</span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                {tokenBudget === 0 ? "semantic / unlimited" : `${tokenBudget} tok max`}
+              </span>
             </label>
             <div className="flex items-center gap-1.5">
-              {[250, 500, 800, 1500].map((b) => (
+              {[0, 500, 800, 1500].map((b) => (
                 <button
                   key={b}
-                  onClick={() => setTokenBudget(b)}
+                  onClick={() => {
+                    setTokenBudget(b);
+                    if (b === 0) {
+                      setProfile("free_query");
+                      setQueryFilter("");
+                    }
+                  }}
                   className={`flex-1 py-1 rounded border text-[11px] font-mono transition-colors ${
                     tokenBudget === b
                       ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold"
                       : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                   }`}
                 >
-                  {b}
+                  {b === 0 ? "Semantic" : b}
                 </button>
               ))}
             </div>
@@ -299,7 +307,7 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
           <div className="flex flex-col justify-end">
             <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span><strong>Safety-Set:</strong> Allergies, Meds, Outliers Never Dropped</span>
+              <span><strong>Mode:</strong> {tokenBudget === 0 ? "Semantic compression; no budget omission" : "Budgeted compression with safety priority"}</span>
             </div>
           </div>
         </div>
@@ -390,6 +398,10 @@ export const SplitWorkbench: React.FC<SplitWorkbenchProps> = ({
             <textarea
               value={rawJsonText}
               onChange={(e) => setRawJsonText(e.target.value)}
+              onPaste={() => {
+                // Pasted payload replaces the sample — sample query no longer applies.
+                if (queryFilter) setQueryFilter("");
+              }}
               className="w-full h-full min-h-[440px] p-2.5 font-mono text-xs bg-transparent text-gray-200 border-0 focus:outline-none resize-none leading-relaxed"
               placeholder="Paste raw FHIR JSON bundle here..."
               spellCheck={false}

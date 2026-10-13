@@ -62,7 +62,7 @@ export const ArchitectureDiagram: React.FC = () => {
               </li>
               <li className="flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                <span><strong>Clinical Retention:</strong> 100% Values, Units & Flags</span>
+                <span><strong>Clinical Retention:</strong> Fixture-validated values, units & flags</span>
               </li>
             </ul>
           </div>

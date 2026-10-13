@@ -1,4 +1,4 @@
-"""namanfhirfold: Fold the structure. Keep every detail.
+"""namanfhirfold: FHIR clinical-context and token optimization SDK.
 
 High-efficiency task-aware FHIR R4 token compression engine.
 """

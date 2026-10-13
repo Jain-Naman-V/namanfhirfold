@@ -98,6 +98,10 @@ export default function App() {
       newPayload = SAMPLE_FULL_CDS_BUNDLE;
       setQueryFilter("");
       setGranularity("date_only");
+    } else if (sample === "custom") {
+      // Custom pasted/uploaded JSON: sample-specific query no longer applies.
+      setQueryFilter("");
+      return;
     } else {
       return;
     }

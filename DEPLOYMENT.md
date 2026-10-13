@@ -1,5 +1,5 @@
 # namanfhirfold Deployment Guide 🚀
-### Fold the structure. Keep every detail.
+### FHIR Clinical-Context and Token Optimization SDK
 **Production Deployment, Package Publishing, and Cloud Infrastructure Runbook**
 
 ---
@@ -271,11 +271,11 @@ gcloud run deploy namanfhirfold \
   --image gcr.io/YOUR_GCP_PROJECT_ID/namanfhirfold:v1 \
   --platform managed \
   --region asia-southeast1 \
-  --allow-unauthenticated \
+  --no-allow-unauthenticated \
   --port 3000 \
   --memory 512Mi \
   --cpu 1 \
-  --set-env-vars OPENAI_API_KEY="your-openai-api-key",OPENAI_BASE_URL="https://api.openai.com/v1",OPENAI_MODEL="gpt-4o-mini"
+  --set-env-vars OPENAI_API_KEY="your-openai-api-key",NAMANFHIRFOLD_API_TOKEN="your-long-random-token",OPENAI_BASE_URL="https://api.openai.com/v1",OPENAI_MODEL="gpt-4o-mini"
 ```
 
 ### AWS ECS / Render / Railway
@@ -371,11 +371,13 @@ export default {
 | `OPENAI_API_KEY` | OpenAI-compatible API key for test inference | Optional | Compression works without it |
 | `OPENAI_BASE_URL` | OpenAI-compatible endpoint base URL | Optional | `https://api.openai.com/v1` |
 | `OPENAI_MODEL` | Model id for inference | Optional | `gpt-4o-mini` |
+| `NAMANFHIRFOLD_API_TOKEN` | Bearer token for compression and LLM API routes | **Required in production** | None |
 
-### HIPAA & Data Governance Compliance
-1. **Stateless Processing:** `namanfhirfold` is purely in-memory and stateless. No patient identifiers, FHIR bundles, or tokens are written to disk or databases.
-2. **Entered-In-Error Drops:** Resources marked `entered-in-error` or `refuted` are permanently filtered from model prompts.
-3. **Audit Trail:** Retains short IDs (`V1`, `O1`, `M1`) linking output directly back to source EHR resource IDs for clinical auditing.
+### Data Governance Boundary
+1. **Stateless Processing:** The compressor is in-memory; deployment logging, reverse proxies, and the configured LLM provider remain separate governance boundaries.
+2. **API redaction:** Public compression responses omit `rawJson` and provenance `fullSnippet`; keep trusted expansion in-process or behind an authenticated service.
+3. **Authentication:** Set `NAMANFHIRFOLD_API_TOKEN` and send `Authorization: Bearer <token>` to `/api/compress`, `/api/evaluate-llm`, and other protected API routes. `/api/health` remains suitable for health probes.
+4. **Clinical status:** `entered-in-error` and `refuted` resources are retained and flagged for audit; they are not silently discarded.
 
 ---
 
@@ -408,7 +410,7 @@ curl -X POST http://localhost:3000/api/test-llm \
 
 ## 🎯 Summary Checklist Before Going Live
 
-- [x] Package metadata updated with `namanfhirfold` & "Fold the structure. Keep every detail."
+- [x] Package metadata updated with `namanfhirfold` and the clinical-context/token optimization positioning.
 - [x] Rust Cargo manifest (`Cargo.toml`) verified
 - [x] NPM package manifest (`package.json`) verified
 - [x] Python setup (`pyproject.toml` & `setup.py`) verified

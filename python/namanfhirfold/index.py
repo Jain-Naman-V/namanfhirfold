@@ -1,6 +1,6 @@
 """
 namanfhirfold - Vercel Python Service Handler
-"Fold the structure. Keep every detail."
+"FHIR clinical-context and token optimization SDK."
 
 Provides HTTP handler for Vercel internal service bindings or public API invocations.
 """
@@ -28,7 +28,7 @@ class handler(BaseHTTPRequestHandler):
             "runtime": "python",
             "version": "0.1.0",
             "status": "healthy",
-            "tagline": "Fold the structure. Keep every detail."
+            "tagline": "Optimize clinical context for fewer tokens."
         }
         self.wfile.write(json.dumps(response).encode("utf-8"))
 
