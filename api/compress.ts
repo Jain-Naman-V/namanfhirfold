@@ -1,11 +1,27 @@
 import type { Request, Response } from "express";
 import { compressFhir } from "../src/services/fhirCompressor.ts";
 import { CompressionOptions } from "../src/types/fhir.ts";
+import { sanitizePublicCompressionResponse, toPublicCompressionResult } from "../src/services/publicCompressionResult.ts";
+
+function authorize(req: Request, res: Response): boolean {
+  const token = process.env.NAMANFHIRFOLD_API_TOKEN;
+  if (!token) {
+    if (process.env.NODE_ENV !== "production") return true;
+    res.status(503).json({ error: "API authentication is not configured" });
+    return false;
+  }
+  if (req.headers.authorization !== `Bearer ${token}`) {
+    res.status(401).json({ error: "Unauthorized" });
+    return false;
+  }
+  return true;
+}
 
 export default async function handler(req: Request, res: Response) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
+  if (!authorize(req, res)) return;
 
   try {
     const { fhir, options } = req.body || {};
@@ -26,7 +42,7 @@ export default async function handler(req: Request, res: Response) {
         if (pyRes.ok) {
           const pyData = await pyRes.json();
           return res.json({
-            ...pyData,
+            ...(sanitizePublicCompressionResponse(pyData) as object),
             engine: "namanfhirfold-python-service",
             source: "vercel-service-binding",
           });
@@ -47,7 +63,7 @@ export default async function handler(req: Request, res: Response) {
     };
 
     const result = compressFhir(fhir, defaultOpts);
-    return res.json(result);
+    return res.json(toPublicCompressionResult(result));
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to compress FHIR payload" });
   }

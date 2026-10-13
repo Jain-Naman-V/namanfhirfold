@@ -1,6 +1,6 @@
 //! # namanfhirfold 🦀
 //! 
-//! > **Fold the structure. Keep every detail.**
+//! > **Optimize clinical context for fewer tokens.**
 //! 
 //! Ultra-fast, zero-copy task-aware FHIR R4 token compression engine.
 //! Designed for Clinical Decision Support (CDS Hooks), EHR proxies, and LLM reasoning agents.
@@ -269,6 +269,34 @@ mod tests {
         }).to_string();
         every_fmt(&grouped, "Doe, Jane");
         every_fmt(&grouped, "Grouped finding");
+    }
+
+    #[test]
+    fn parity_clinical_field_retention() {
+        let raw = bundle(vec![
+            serde_json::json!({
+                "resourceType": "Condition",
+                "id": "condition-body-site",
+                "code": { "text": "Allergic asthma" },
+                "bodySite": [{
+                    "text": "Unilateral left",
+                    "coding": [{ "system": "http://snomed.info/sct", "code": "419161000", "display": "Unilateral left" }]
+                }],
+                "recordedDate": "2025-12-14T15:17:34-05:00"
+            }),
+            serde_json::json!({
+                "resourceType": "Procedure",
+                "id": "procedure-performed-period",
+                "code": { "text": "Follow-up procedure" },
+                "performedPeriod": {
+                    "start": "2026-04-14T14:07:53-04:00",
+                    "end": "2026-04-14T14:25:29-04:00"
+                }
+            }),
+        ]);
+        every_fmt(&raw, "Unilateral left");
+        every_fmt(&raw, "2026-04-14T14:07:53-04:00");
+        every_fmt(&raw, "2026-04-14T14:25:29-04:00");
     }
 
     #[test]

@@ -15,7 +15,7 @@ export const PackageHub: React.FC = () => {
   const npmPackageJson = `{
   "name": "namanfhirfold",
   "version": "0.1.0",
-  "description": "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs.",
+  "description": "FHIR clinical-context and token optimization SDK for CDS Hooks and LLMs.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -59,7 +59,7 @@ name = "namanfhirfold"
 version = "0.1.0"
 edition = "2021"
 authors = ["Jain-Naman-V <namanvjain456@gmail.com>"]
-description = "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs"
+description = "FHIR clinical-context and token optimization SDK for CDS Hooks and LLMs"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/naman/namanfhirfold"
@@ -375,7 +375,7 @@ print(f"Compressed Context for LLM:\\n{llm_input}")
             <span>Keep Every Detail</span>
           </div>
           <p className="text-gray-600 dark:text-gray-400 text-[11px] leading-relaxed">
-            100% of LOINC/RxNorm codes, numerical values, UCUM units, abnormal flags, and ranges stay intact.
+            Covered LOINC/RxNorm codes, numerical values, UCUM units, abnormal flags, and ranges are retained by the validated fixtures.
           </p>
         </div>
 

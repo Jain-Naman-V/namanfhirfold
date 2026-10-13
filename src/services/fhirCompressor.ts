@@ -6,10 +6,10 @@
  *
  * 6-Stage Pipeline:
  * 1. Parse & reference indexing
- * 2. Lossless strip (meta, text.div, URIs, search wrappers)
+ * 2. Structural strip (meta, text.div, URIs, search wrappers)
  * 3. Dedupe & safety validation (filter entered-in-error / refuted)
  * 4. Task-aware intent & profile selection (CDS deterministic vs free query)
- * 5. Ranking & Token Budgeting (guaranteed Safety Set: allergies, active meds, critical abnormal)
+ * 5. Ranking & Token Budgeting (safety resources prioritized with explicit overflow)
  * 6. Provenance mapping (short refs: O1, M1, CP1) + Omission transparency
  */
 
@@ -49,6 +49,20 @@ function humanName(n: any): string {
     .join(" | ");
 }
 
+function calculateAge(birthDate?: string): number | undefined {
+  if (!birthDate) return undefined;
+  const dob = new Date(`${birthDate.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(dob.getTime())) return undefined;
+  const today = new Date();
+  if (dob > today) return undefined;
+  let age = today.getUTCFullYear() - dob.getUTCFullYear();
+  const birthdayPassed =
+    today.getUTCMonth() > dob.getUTCMonth() ||
+    (today.getUTCMonth() === dob.getUTCMonth() && today.getUTCDate() >= dob.getUTCDate());
+  if (!birthdayPassed) age -= 1;
+  return Math.max(0, age);
+}
+
 // text + coding display together when they differ (e.g. "Refuted (w/u negative)")
 function codeDisplay(c: any): string {
   if (!c) return "";
@@ -58,7 +72,7 @@ function codeDisplay(c: any): string {
   return text || disp;
 }
 
-// text + every coding display/code, unique (lossless: multi-coding concepts keep all faces)
+// text + every coding display/code, unique within the supported concept contract
 function conceptAll(c: any): string {
   if (!c) return "";
   const parts: string[] = [];
@@ -190,6 +204,22 @@ function obsDate(res: any): string | undefined {
   return undefined;
 }
 
+function resourceDateSpan(res: any, granularity: GranularityMode): string | undefined {
+  const period = res.performedPeriod || res.occurrencePeriod || res.period;
+  const start = formatDateTime(
+    obsDate(res) ||
+      res.performedDateTime ||
+      res.occurrenceDateTime ||
+      period?.start ||
+      res.recordedDate ||
+      res.authoredOn,
+    granularity
+  );
+  const end = formatDateTime(period?.end, granularity);
+  if (start && end && start !== end) return `${start} to ${end}`;
+  return start || end || undefined;
+}
+
 // Format reference range string e.g. "13.0-17.0 g/dL"
 function formatRefRange(ranges?: any[]): string | undefined {
   if (!ranges || ranges.length === 0) return undefined;
@@ -272,7 +302,7 @@ export function compressFhir(
   }
 
   const profile: CdsProfile = options.profile || "free_query";
-  const tokenBudget = options.tokenBudget && options.tokenBudget > 0 ? options.tokenBudget : 800;
+  const tokenBudget = options.tokenBudget && options.tokenBudget > 0 ? options.tokenBudget : 0;
 
   // 2. Flag invalid / refuted / entered-in-error items (kept: ruling-out IS clinical data)
   const validResources = rawResources;
@@ -333,6 +363,31 @@ export function compressFhir(
       return false;
     });
     if (selectedResources.length === 0) selectedResources = validResources;
+  }
+
+  // Enforce a deterministic pre-transform budget. Safety resources are always
+  // retained; non-safety resources are retained in input order until the
+  // conservative JSON token estimate is exhausted.
+  const safetyResource = (res: any): boolean => {
+    const rt = res.resourceType || "";
+    if (["Patient", "AllergyIntolerance", "CarePlan"].includes(rt)) return true;
+    if (rt.startsWith("Medication")) return res.status !== "stopped" && res.status !== "entered-in-error";
+    return false;
+  };
+  const estimateTokens = (res: any): number => Math.max(1, Math.ceil(JSON.stringify(res).length / 3));
+  let budgetExceeded = false;
+  if (tokenBudget > 0) {
+    const safety = selectedResources.filter(safetyResource);
+    const normal = selectedResources.filter((res) => !safetyResource(res));
+    let used = safety.reduce((sum, res) => sum + estimateTokens(res), 0);
+    const withinBudget = normal.filter((res) => {
+      const cost = estimateTokens(res);
+      if (used + cost > tokenBudget) return false;
+      used += cost;
+      return true;
+    });
+    budgetExceeded = safety.length + withinBudget.length < selectedResources.length;
+    selectedResources = [...safety, ...withinBudget];
   }
 
   // 4. Transform & Index Provenance
@@ -425,7 +480,7 @@ export function compressFhir(
           name: name || undefined,
           aka: aka.length ? aka : undefined,
           gender: res.gender,
-          age: res.birthDate ? 2026 - new Date(res.birthDate).getFullYear() : undefined,
+          age: calculateAge(res.birthDate),
           dob: res.birthDate,
           phone: (res.telecom || []).find((t: any) => t.system === "phone" && t.value)?.value,
           telecom: tel.length ? tel : undefined,
@@ -698,7 +753,12 @@ export function compressFhir(
           statusText: res.clinicalStatus?.text,
           verification: codeDisplay(res.verificationStatus) || undefined,
           category: codeDisplay(res.category?.[0]) || undefined,
+          bodySite: (res.bodySite || [])
+            .map((site: any) => conceptAll(site))
+            .filter(Boolean)
+            .join(", ") || undefined,
           onset: formatDateTime(res.onsetDateTime || res.recordedDate, granularity) || undefined,
+          recorded: formatDateTime(res.recordedDate, granularity) || undefined,
           note: res.note?.[0]?.text?.slice(0, 300),
         };
         conditions.push(cObj);
@@ -825,7 +885,7 @@ export function compressFhir(
           role: role || undefined,
           status: res.status || res.clinicalStatus?.coding?.[0]?.code,
           value: extractValue(res).value || undefined,
-          date: formatDateTime(obsDate(res) || res.recordedDate || res.authoredOn, granularity) || undefined,
+          date: resourceDateSpan(res, granularity),
         });
         provenanceMap[`X${others.length}`] = {
           shortRef: `X${others.length}`,
@@ -881,7 +941,9 @@ export function compressFhir(
   const omittedCount = Math.max(0, validResources.length - selectedResources.length);
   let omittedNotice: string | undefined = undefined;
   if (omittedCount > 0) {
-    omittedNotice = `## Omitted: ${omittedCount} items not matching query/profile filter → clear query to include all, or retrievable via expand(ref)`;
+    omittedNotice = budgetExceeded
+      ? `## Omitted: ${omittedCount} items due to token budget; safety resources retained (call expand(ref) for omitted items)`
+      : `## Omitted: ${omittedCount} items not matching query/profile filter → clear query to include all, or retrievable via expand(ref)`;
   }
 
   const flaggedNotice = flaggedIds.size
@@ -906,7 +968,7 @@ export function compressFhir(
     if (medications.length > 0) compactObj.medications = medications;
     if (encounters.length > 0) compactObj.encounters = encounters;
     if (others.length > 0) compactObj.other = others;
-    if (omittedNotice) compactObj._omitted = `${omittedCount} items omitted by query/profile filter, not token budget (clear query to include all, or call expand(ref))`;
+    if (omittedNotice) compactObj._omitted = omittedNotice.replace(/^## /, "");
     if (flaggedNotice) compactObj._flagged = `${flaggedIds.size} resource(s) entered-in-error or refuted (retained)`;
     if (gapNotice) compactObj._dataGaps = dataGaps;
 
@@ -954,7 +1016,7 @@ export function compressFhir(
     if (conditions.length > 0) {
       lines.push(`\n## ACTIVE CONDITIONS:`);
       conditions.forEach((c) => {
-        lines.push(`[${c.ref}] ${c.condition} [${c.status}${c.statusText ? "/" + c.statusText : ""}]${c.verification ? "/" + c.verification : ""}${c.category ? ` {${c.category}}` : ""}${c.onset ? ` (Onset: ${c.onset})` : ""}${c.note ? ` Note: ${c.note}` : ""}`);
+        lines.push(`[${c.ref}] ${c.condition} [${c.status}${c.statusText ? "/" + c.statusText : ""}]${c.verification ? "/" + c.verification : ""}${c.category ? ` {${c.category}}` : ""}${c.bodySite ? ` (Body site: ${c.bodySite})` : ""}${c.onset ? ` (Onset: ${c.onset})` : ""}${c.recorded ? ` (Recorded: ${c.recorded})` : ""}${c.note ? ` Note: ${c.note}` : ""}`);
       });
     }
     if (medications.length > 0) {
@@ -971,7 +1033,7 @@ export function compressFhir(
     }
     if (others.length > 0) {
       lines.push(`\n## OTHER RESOURCES:`);
-      others.forEach((o) => lines.push(`[${o.ref}] ${o.type} ${o.name || o.id || ""}${o.role ? ` [${o.role}]` : ""} ${o.status || ""}${o.value !== undefined && o.value !== null && o.value !== "" ? ` = ${o.value}` : ""}`.trim()));
+      others.forEach((o) => lines.push(`[${o.ref}] ${o.type} ${o.name || o.id || ""}${o.role ? ` [${o.role}]` : ""} ${o.status || ""}${o.value !== undefined && o.value !== null && o.value !== "" ? ` = ${o.value}` : ""}${o.date ? ` (${o.date})` : ""}`.trim()));
     }
     if (omittedNotice) {
       lines.push(`\n${omittedNotice}`);
@@ -1068,8 +1130,8 @@ export function compressFhir(
     }
     if (conditions.length > 0) {
       sections.push(
-        `### Active Conditions\n| Ref | Condition | Status | Verification | Category | Onset | Note |\n|---|---|---|---|---|---|---|\n` +
-        conditions.map((c) => `| **${c.ref}** | ${c.condition} | ${c.status}${c.statusText ? ` (${c.statusText})` : ""} | ${c.verification || "—"} | ${c.category || "—"} | ${c.onset || "—"} | ${c.note || "—"} |`).join("\n")
+        `### Active Conditions\n| Ref | Condition | Status | Verification | Category | Body Site | Onset | Recorded | Note |\n|---|---|---|---|---|---|---|---|---|\n` +
+        conditions.map((c) => `| **${c.ref}** | ${c.condition} | ${c.status}${c.statusText ? ` (${c.statusText})` : ""} | ${c.verification || "—"} | ${c.category || "—"} | ${c.bodySite || "—"} | ${c.onset || "—"} | ${c.recorded || "—"} | ${c.note || "—"} |`).join("\n")
       );
     }
     if (encounters.length > 0) {
@@ -1125,7 +1187,7 @@ export function compressFhir(
   const compressedTokens = Math.max(1, Math.round(compressedCharCount / 3.8));
   const reductionPercentage = Math.round(((rawTokens - compressedTokens) / rawTokens) * 100);
   const tokenMultiple = Math.round((rawTokens / Math.max(1, compressedTokens)) * 10) / 10;
-  const budgetUtilization = Math.round((compressedTokens / tokenBudget) * 100);
+  const budgetUtilization = tokenBudget > 0 ? Math.round((compressedTokens / tokenBudget) * 100) : 0;
 
   // Extract & Audit Clinical Facts
   const clinicalFacts: ClinicalFact[] = [];
@@ -1285,6 +1347,7 @@ export function compressFhir(
     factRetentionRate,
     provenanceMap,
     omittedCount,
+    budgetExceeded,
     omittedItemsNotice: omittedNotice,
     resourceBreakdown,
   };

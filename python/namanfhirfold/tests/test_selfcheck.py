@@ -163,6 +163,49 @@ def test_grouped_export():
     every_fmt(grouped, "Grouped finding")
 
 
+def test_clinical_field_retention():
+    bundle_data = bundle([
+        {
+            "resourceType": "Condition",
+            "id": "condition-body-site",
+            "code": {"text": "Allergic asthma"},
+            "bodySite": [{
+                "text": "Unilateral left",
+                "coding": [{"system": "http://snomed.info/sct", "code": "419161000", "display": "Unilateral left"}],
+            }],
+            "recordedDate": "2025-12-14T15:17:34-05:00",
+        },
+        {
+            "resourceType": "Procedure",
+            "id": "procedure-performed-period",
+            "code": {"text": "Follow-up procedure"},
+            "performedPeriod": {
+                "start": "2026-04-14T14:07:53-04:00",
+                "end": "2026-04-14T14:25:29-04:00",
+            },
+        },
+    ])
+    for f in FMTS:
+        result = out(bundle_data, f)
+        assert "Unilateral left" in result, f"bodySite missing in {f}"
+        assert "2026-04-14T14:07:53-04:00" in result, f"performed start missing in {f}"
+        assert "2026-04-14T14:25:29-04:00" in result, f"performed end missing in {f}"
+
+
+def test_age_is_birthday_aware():
+    from datetime import date, timedelta
+    today = date.today()
+    current_year = today.year
+    tomorrow = today + timedelta(days=1)
+    yesterday = today - timedelta(days=1)
+    before_birthday = f"{current_year - 26:04d}-{tomorrow.month:02d}-{tomorrow.day:02d}"
+    after_birthday = f"{current_year - 26:04d}-{yesterday.month:02d}-{yesterday.day:02d}"
+    before = out(bundle([{"resourceType": "Patient", "id": "p-age", "birthDate": before_birthday}]), "compact_json")
+    after = out(bundle([{"resourceType": "Patient", "id": "p-age", "birthDate": after_birthday}]), "compact_json")
+    assert '"age": 25' in before
+    assert '"age": 26' in after
+
+
 # ---------------------------------------------------------------------------
 # Substring audit (port of /tmp/verify.ts): presets + EHR files
 # ---------------------------------------------------------------------------
@@ -312,8 +355,8 @@ def test_audit_presets_and_ehr():
             print(f"  FAIL {name} {f}: lost={len(lost)} blankRows={blanks}")
             print(f"     e.g. {[v[:60] for v in lost[:10]]}")
 
-    ehr_dir = "/Users/scamac-31/Documents/Smarterfhir/backend/"
-    if os.path.isdir(ehr_dir):
+    ehr_dir = os.environ.get("NAMANFHIRFOLD_EHR_AUDIT_DIR")
+    if ehr_dir and os.path.isdir(ehr_dir):
         print("--- EHR files ---")
         for fn in sorted(os.listdir(ehr_dir)):
             if not fn.startswith("patient_all_data_") or not fn.endswith(".json"):
@@ -336,5 +379,7 @@ if __name__ == "__main__":
     test_has_member_grouping()
     test_refuted_retained()
     test_grouped_export()
+    test_clinical_field_retention()
+    test_age_is_birthday_aware()
     test_audit_presets_and_ehr()
     print("fhirFold.test_selfcheck: all assertions passed")

@@ -1,8 +1,15 @@
 # namanfhirfold 🐍
 
-> **Fold the structure. Keep every detail.**
+> **Optimize clinical context for fewer tokens.**
 
-Task-aware FHIR R4 token compression engine for Python. Shrinks verbose EHR bundles by **85% to 94%** for OpenAI, Gemini, Anthropic Claude, LangChain, and LlamaIndex agents while strictly preserving clinical facts, codes, units, and ranges.
+FHIR clinical-context/token optimization SDK for Python. Converts verbose EHR bundles into compact LLM-ready context while retaining the clinical fields covered by the supported contract and regression fixtures.
+
+### Input and output
+
+- Input: a FHIR R4 resource or Bundle as a Python `dict` or JSON string.
+- Output: a compact `str` from `fold()`, or a `FoldResult` from `fold_with_provenance()` containing compact output, short references, and an in-process provenance map.
+- Formats: `compact_json`, `medprompt_text`, `fhirbench_markdown`, and `cds_hooks_prefetch`.
+- `token_budget=0` or `None` means unlimited selection; a positive budget emits an omission notice when resources cannot fit.
 
 ---
 
@@ -19,7 +26,7 @@ from namanfhirfold import fold, FoldOptions, CdsProfile
 with open("patient_bundle.json") as f:
     raw_bundle = f.read()
 
-# 2. Fold the structure, keep every detail
+# 2. Optimize the clinical context for an LLM
 compressed_output = fold(
     raw_bundle,
     profile=CdsProfile.VITALS_MONITOR,  # or MEDICATION_PRESCRIBE, PATIENT_VIEW, FREE_QUERY
@@ -34,8 +41,9 @@ print(f"Compressed LLM Input:\n{compressed_output}")
 
 ## 🔓 Decompression: `expand(ref)`
 
-Every fold emits a short reference per retained resource and stores the **full original
-resource** in the provenance map, so the round-trip is lossless.
+Every fold emits a short reference per retained resource and can store the original
+resource in the local provenance map for trusted expansion. The compact output is a
+task-aware representation, not a substitute for the canonical FHIR source.
 
 | Ref | Resource |
 |---|---|

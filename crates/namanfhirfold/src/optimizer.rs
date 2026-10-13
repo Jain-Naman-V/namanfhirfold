@@ -1,6 +1,7 @@
 use crate::models::*;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn get_str<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
     v.get(k).and_then(|x| x.as_str())
@@ -340,6 +341,30 @@ pub fn obs_date(res: &Value) -> Option<String> {
     None
 }
 
+pub fn resource_date_span(res: &Value, granularity: &str) -> String {
+    let period = get_map(res, "performedPeriod")
+        .or_else(|| get_map(res, "occurrencePeriod"))
+        .or_else(|| get_map(res, "period"));
+    let start_raw = obs_date(res)
+        .or_else(|| get_str(res, "performedDateTime").map(str::to_string))
+        .or_else(|| get_str(res, "occurrenceDateTime").map(str::to_string))
+        .or_else(|| period.and_then(|p| p.get("start")).and_then(|v| v.as_str()).map(str::to_string))
+        .or_else(|| get_str(res, "recordedDate").map(str::to_string))
+        .or_else(|| get_str(res, "authoredOn").map(str::to_string));
+    let start = format_date_time(start_raw.as_deref(), granularity);
+    let end = format_date_time(
+        period.and_then(|p| p.get("end")).and_then(|v| v.as_str()),
+        granularity,
+    );
+    if !start.is_empty() && !end.is_empty() && start != end {
+        format!("{} to {}", start, end)
+    } else if !start.is_empty() {
+        start
+    } else {
+        end
+    }
+}
+
 pub fn format_ref_range(ranges: Option<&Vec<Value>>) -> Option<String> {
     let ranges = ranges?;
     if ranges.is_empty() {
@@ -496,9 +521,41 @@ fn ingest(data: &Value) -> (Vec<Value>, HashMap<String, usize>, Vec<String>) {
 // Execute optimization
 // ---------------------------------------------------------------------------
 
-fn current_year() -> i64 {
-    // parity: TS hardcodes 2026
-    2026
+fn calculate_age(birth_date: Option<&str>) -> Option<i64> {
+    let birth = birth_date?.get(..10)?;
+    let birth_year = birth.get(0..4)?.parse::<i32>().ok()?;
+    let birth_month = birth.get(5..7)?.parse::<u32>().ok()?;
+    let birth_day = birth.get(8..10)?.parse::<u32>().ok()?;
+    if !(1..=12).contains(&birth_month) || !(1..=31).contains(&birth_day) {
+        return None;
+    }
+    let days_since_epoch = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_secs() as i64 / 86_400;
+    let (today_year, today_month, today_day) = civil_from_days(days_since_epoch);
+    if (birth_year, birth_month, birth_day) > (today_year, today_month, today_day) {
+        return None;
+    }
+    let mut age = i64::from(today_year - birth_year);
+    if (today_month, today_day) < (birth_month, birth_day) {
+        age -= 1;
+    }
+    Some(age.max(0))
+}
+
+fn civil_from_days(days: i64) -> (i32, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if month <= 2 { 1 } else { 0 };
+    (year as i32, month as u32, day as u32)
 }
 
 pub fn execute_optimization(raw_fhir_json: &str, options: &CompressionOptions) -> Result<OptimizationResult, String> {
@@ -523,7 +580,7 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
 
     let profile = options.profile.as_str().to_string();
     let query_filter = options.query_filter.clone();
-    let _unused_budget = options.token_budget; // budget accounting lives in caller metrics
+    let token_budget = options.token_budget.unwrap_or(0);
 
     // Flag invalid / refuted / entered-in-error items (kept: ruling-out IS clinical data)
     let valid_resources = &raw_resources;
@@ -548,7 +605,7 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
         .collect();
 
     // Task-Aware Selection
-    let selected_resources: Vec<Value> = if profile == "medication_prescribe" {
+    let mut selected_resources: Vec<Value> = if profile == "medication_prescribe" {
         valid_resources
             .iter()
             .filter(|res| {
@@ -623,6 +680,34 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
     } else {
         valid_resources.clone()
     };
+
+    let mut budget_exceeded = false;
+    if token_budget > 0 {
+        let is_safety = |res: &Value| {
+            let rt = get_str(res, "resourceType").unwrap_or("");
+            if ["Patient", "AllergyIntolerance", "CarePlan"].contains(&rt) {
+                return true;
+            }
+            rt.starts_with("Medication")
+                && get_str(res, "status") != Some("stopped")
+                && get_str(res, "status") != Some("entered-in-error")
+        };
+        let estimate = |res: &Value| ((json_str(res).len() as f64) / 3.0).ceil() as usize;
+        let safety: Vec<Value> = selected_resources.iter().filter(|r| is_safety(r)).cloned().collect();
+        let normal: Vec<Value> = selected_resources.iter().filter(|r| !is_safety(r)).cloned().collect();
+        let mut used: usize = safety.iter().map(&estimate).sum();
+        let mut within = Vec::new();
+        for res in normal {
+            let cost = estimate(&res);
+            if used + cost <= token_budget {
+                used += cost;
+                within.push(res);
+            }
+        }
+        budget_exceeded = safety.len() + within.len() < selected_resources.len();
+        selected_resources = safety;
+        selected_resources.extend(within);
+    }
 
     // Transform & index provenance
     let mut patients: Vec<Value> = Vec::new();
@@ -782,7 +867,7 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
                 arr.iter().filter_map(|g| g.get("display").and_then(|d| d.as_str()).map(|d| d.to_string())).collect::<Vec<_>>().join(", ")
             }).unwrap_or_default();
             let birth = get_str(res, "birthDate");
-            let age = birth.map(|b| current_year() - b[..4].parse::<i64>().unwrap_or(0));
+            let age = calculate_age(birth);
             let phone = res.get("telecom").and_then(|x| x.as_array()).and_then(|arr| {
                 arr.iter().find(|t| t.get("system").and_then(|x| x.as_str()) == Some("phone"))
                     .and_then(|t| t.get("value"))
@@ -1216,7 +1301,12 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
             let status_text = res.get("clinicalStatus").and_then(|x| x.get("text")).and_then(|x| x.as_str()).map(|x| x.to_string());
             let verification = code_display(res.get("verificationStatus").unwrap_or(&json!(null)));
             let category = code_display(res.get("category").and_then(|x| x.as_array()).and_then(|a| a.first()).unwrap_or(&json!(null)));
+            let body_site = res.get("bodySite")
+                .and_then(|x| x.as_array())
+                .map(|sites| sites.iter().map(concept_all).filter(|x| !x.is_empty()).collect::<Vec<_>>().join(", "))
+                .unwrap_or_default();
             let onset = format_date_time(get_str(res, "onsetDateTime").or(get_str(res, "recordedDate")), &granularity);
+            let recorded = format_date_time(get_str(res, "recordedDate"), &granularity);
             let note = res.get("note").and_then(|x| x.as_array()).and_then(|a| a.first()).and_then(|n| n.get("text")).and_then(|t| t.as_str()).map(|t| t.chars().take(300).collect::<String>()).unwrap_or_default();
             let mut c_obj = Map::new();
             c_obj.insert("ref".into(), json!(short_ref.clone()));
@@ -1228,7 +1318,9 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
             c_obj.insert("statusText".into(), status_text.clone().map(Value::String).unwrap_or(Value::Null));
             c_obj.insert("verification".into(), if verification.is_empty() { Value::Null } else { Value::String(verification.clone()) });
             c_obj.insert("category".into(), if category.is_empty() { Value::Null } else { Value::String(category) });
+            c_obj.insert("bodySite".into(), if body_site.is_empty() { Value::Null } else { Value::String(body_site) });
             c_obj.insert("onset".into(), if onset.is_empty() { Value::Null } else { Value::String(onset) });
+            c_obj.insert("recorded".into(), if recorded.is_empty() { Value::Null } else { Value::String(recorded) });
             c_obj.insert("note".into(), if note.is_empty() { Value::Null } else { Value::String(note) });
             let ver_part = if verification.is_empty() { String::new() } else { format!("/{}", verification) };
             let summary = format!("{} [{}{}]",
@@ -1432,7 +1524,7 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
                 .or_else(|| res.get("clinicalStatus").and_then(|x| x.get("coding")).and_then(|x| x.as_array()).and_then(|a| a.first()).and_then(|c| c.get("code")).cloned())
                 .unwrap_or(Value::Null);
             let value = extract_value(res).get("value").cloned().filter(|v| is_truthy(v)).unwrap_or(Value::Null);
-            let date = format_date_time(obs_date(res).as_deref().or(get_str(res, "recordedDate")).or(get_str(res, "authoredOn")), &granularity);
+            let date = resource_date_span(res, &granularity);
             let idx = others.len() + 1;
             let mut row = Map::new();
             row.insert("ref".into(), json!(format!("X{}", idx)));
@@ -1532,8 +1624,9 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
     let omitted_count = valid_resources.len().saturating_sub(selected_resources.len());
     let omitted_notice = if omitted_count > 0 {
         Some(format!(
-            "## Omitted: {} items not matching query/profile filter → clear query to include all, or retrievable via expand(ref)",
-            omitted_count
+            "## Omitted: {} items {}",
+            omitted_count,
+            if budget_exceeded { "due to token budget; safety resources retained" } else { "not matching query/profile filter → clear query to include all, or retrievable via expand(ref)" }
         ))
     } else {
         None
@@ -1585,8 +1678,9 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
             }
             if omitted_notice.is_some() {
                 compact_obj.insert("_omitted".into(), json!(format!(
-                    "{} items omitted by query/profile filter, not token budget (clear query to include all, or call expand(ref))",
-                    omitted_count
+                    "{} items omitted {}",
+                    omitted_count,
+                    if budget_exceeded { "due to token budget; safety resources retained" } else { "by query/profile filter (clear query to include all, or call expand(ref))" }
                 )));
             }
             if flagged_notice.is_some() {
@@ -1717,10 +1811,12 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
                     let st_text_part = if !get("statusText").is_empty() { format!("/{}", get("statusText")) } else { String::new() };
                     let ver_part = if !get("verification").is_empty() { format!("/{}", get("verification")) } else { String::new() };
                     let cat_part = if !get("category").is_empty() { format!(" {{{}}}", get("category")) } else { String::new() };
+                    let body_site_part = if !get("bodySite").is_empty() { format!(" (Body site: {})", get("bodySite")) } else { String::new() };
                     let onset_part = if !get("onset").is_empty() { format!(" (Onset: {})", get("onset")) } else { String::new() };
+                    let recorded_part = if !get("recorded").is_empty() { format!(" (Recorded: {})", get("recorded")) } else { String::new() };
                     let note_part = if !get("note").is_empty() { format!(" Note: {}", get("note")) } else { String::new() };
-                    lines.push(format!("[{}] {} [{}{}{}]{}{}{}",
-                        get("ref"), get("condition"), get("status"), st_text_part, ver_part, cat_part, onset_part, note_part
+                    lines.push(format!("[{}] {} [{}{}{}]{}{}{}{}{}",
+                        get("ref"), get("condition"), get("status"), st_text_part, ver_part, cat_part, body_site_part, onset_part, recorded_part, note_part
                     ));
                 }
             }
@@ -1772,8 +1868,9 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
                         Some(v) if !v.is_null() && v != &json!("") => format!(" = {}", v),
                         _ => String::new(),
                     };
-                    lines.push(format!("[{}] {} {}{} {}{}",
-                        get("ref"), get("type"), name_part, role_part, get("status"), val_part
+                    let date_part = if !get("date").is_empty() { format!(" ({})", get("date")) } else { String::new() };
+                    lines.push(format!("[{}] {} {}{} {}{}{}",
+                        get("ref"), get("type"), name_part, role_part, get("status"), val_part, date_part
                     ));
                 }
             }
@@ -1976,12 +2073,12 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
                 for c in &conditions {
                     let get = |k: &str| c.get(k).and_then(|x| x.as_str()).unwrap_or("");
                     let st_part = if !get("statusText").is_empty() { format!(" ({})", get("statusText")) } else { String::new() };
-                    rows.push(format!("| **{}** | {} | {}{} | {} | {} | {} | {} |",
+                    rows.push(format!("| **{}** | {} | {}{} | {} | {} | {} | {} | {} | {} |",
                         get("ref"), get("condition"), get("status"), st_part,
-                        get("verification").or_empty_dash(), get("category").or_empty_dash(), get("onset").or_empty_dash(), get("note").or_empty_dash()
+                        get("verification").or_empty_dash(), get("category").or_empty_dash(), get("bodySite").or_empty_dash(), get("onset").or_empty_dash(), get("recorded").or_empty_dash(), get("note").or_empty_dash()
                     ));
                 }
-                sections.push(format!("### Active Conditions\n| Ref | Condition | Status | Verification | Category | Onset | Note |\n|---|---|---|---|---|---|---|\n{}", rows.join("\n")));
+                sections.push(format!("### Active Conditions\n| Ref | Condition | Status | Verification | Category | Body Site | Onset | Recorded | Note |\n|---|---|---|---|---|---|---|---|---|\n{}", rows.join("\n")));
             }
             if !encounters.is_empty() {
                 let mut rows: Vec<String> = Vec::new();
@@ -2082,6 +2179,7 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
         fact_retention_rate,
         provenance_map,
         omitted_count,
+        budget_exceeded,
         omitted_notice,
     })
 }

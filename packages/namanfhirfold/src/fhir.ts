@@ -128,6 +128,7 @@ export interface CompressionResult {
   factRetentionRate: number; // e.g. 100%
   provenanceMap: Record<string, ProvenanceEntry>;
   omittedCount: number;
+  budgetExceeded: boolean;
   omittedItemsNotice?: string;
   resourceBreakdown: {
     resourceType: string;

@@ -1,6 +1,7 @@
 import json
 import re
 import time
+from datetime import date
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, List, Optional, Tuple, Union
@@ -40,6 +41,7 @@ class FoldResult:
     """Full result of a fold: the compact output plus the provenance map for expansion."""
     output: str
     provenance_map: Dict[str, ProvenanceEntry] = field(default_factory=dict)
+    budget_exceeded: bool = False
 
     @property
     def short_refs(self) -> List[str]:
@@ -129,7 +131,7 @@ def code_display(c: Any) -> str:
 
 
 def concept_all(c: Any) -> str:
-    """text + every coding display/code, unique (lossless: multi-coding concepts keep all faces)."""
+    """text + every coding display/code, unique within the supported concept contract."""
     if not c or not isinstance(c, dict):
         return ""
     parts: List[str] = []
@@ -305,6 +307,23 @@ def _obs_date(res: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _resource_date_span(res: Dict[str, Any], granularity: str) -> str:
+    period = res.get("performedPeriod") or res.get("occurrencePeriod") or res.get("period") or {}
+    start = _format_date_time(
+        _obs_date(res)
+        or res.get("performedDateTime")
+        or res.get("occurrenceDateTime")
+        or period.get("start")
+        or res.get("recordedDate")
+        or res.get("authoredOn"),
+        granularity,
+    )
+    end = _format_date_time(period.get("end"), granularity)
+    if start and end and start != end:
+        return f"{start} to {end}"
+    return start or end
+
+
 def _format_ref_range(ranges: Any) -> Optional[str]:
     if not ranges:
         return None
@@ -332,6 +351,22 @@ def _note_join(items: Any) -> str:
 
 def _current_year() -> int:
     return int(time.strftime("%Y"))
+
+
+def _calculate_age(birth_date: Optional[str]) -> Optional[int]:
+    if not birth_date:
+        return None
+    try:
+        dob = date.fromisoformat(str(birth_date)[:10])
+    except ValueError:
+        return None
+    today = date.today()
+    if dob > today:
+        return None
+    age = today.year - dob.year
+    if (today.month, today.day) < (dob.month, dob.day):
+        age -= 1
+    return max(0, age)
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +481,7 @@ def fold_with_provenance(
             granularity = "exact_timestamp"
 
     profile = str(profile)
-    _unused_budget = token_budget  # budget accounting lives in the caller metrics
+    budget_exceeded = False
 
     # Flag invalid / refuted / entered-in-error items (kept: ruling-out IS clinical data)
     valid_resources = raw_resources
@@ -505,6 +540,28 @@ def fold_with_provenance(
         selected_resources = [r for r in valid_resources if keep(r)]
         if not selected_resources:
             selected_resources = valid_resources
+
+    if token_budget and token_budget > 0:
+        def is_safety(res: Dict[str, Any]) -> bool:
+            rt = res.get("resourceType") or ""
+            if rt in ("Patient", "AllergyIntolerance", "CarePlan"):
+                return True
+            return rt.startswith("Medication") and res.get("status") not in ("stopped", "entered-in-error")
+
+        def estimate(res: Dict[str, Any]) -> int:
+            return max(1, (len(json.dumps(res, separators=(",", ":"))) + 2) // 3)
+
+        safety = [r for r in selected_resources if is_safety(r)]
+        normal = [r for r in selected_resources if not is_safety(r)]
+        used = sum(estimate(r) for r in safety)
+        within = []
+        for res in normal:
+            cost = estimate(res)
+            if used + cost <= token_budget:
+                used += cost
+                within.append(res)
+        budget_exceeded = len(safety) + len(within) < len(selected_resources)
+        selected_resources = safety + within
 
     # Transform & index provenance
     patients: List[Dict[str, Any]] = []
@@ -592,7 +649,7 @@ def fold_with_provenance(
                 "name": name or None,
                 "aka": aka or None,
                 "gender": res.get("gender"),
-                "age": (_current_year() - int(str(birth)[:4])) if birth else None,
+                "age": _calculate_age(birth),
                 "dob": birth,
                 "phone": next((t.get("value") for t in (res.get("telecom") or [])
                                if isinstance(t, dict) and t.get("system") == "phone" and t.get("value")), None),
@@ -894,7 +951,11 @@ def fold_with_provenance(
                 "statusText": (res.get("clinicalStatus") or {}).get("text"),
                 "verification": code_display(res.get("verificationStatus")) or None,
                 "category": code_display((res.get("category") or [None])[0]) or None,
+                "bodySite": ", ".join(
+                    x for x in (concept_all(site) for site in (res.get("bodySite") or [])) if x
+                ) or None,
                 "onset": _format_date_time(res.get("onsetDateTime") or res.get("recordedDate"), granularity) or None,
+                "recorded": _format_date_time(res.get("recordedDate"), granularity) or None,
                 "note": ((res.get("note") or [{}])[0].get("text") or "")[:300] or None,
             }
             conditions.append(c_obj)
@@ -1040,7 +1101,7 @@ def fold_with_provenance(
                 "role": role or None,
                 "status": res.get("status") or ((res.get("clinicalStatus") or {}).get("coding") or [{}])[0].get("code"),
                 "value": _extract_value(res).get("value") or None,
-                "date": _format_date_time(_obs_date(res) or res.get("recordedDate") or res.get("authoredOn"), granularity) or None,
+                "date": _resource_date_span(res, granularity) or None,
             })
             key = f"X{others.__len__()}"
             provenance_map[key] = ProvenanceEntry(
@@ -1096,6 +1157,9 @@ def fold_with_provenance(
     omitted_notice = None
     if omitted_count > 0:
         omitted_notice = (
+            f"## Omitted: {omitted_count} items due to token budget; safety resources retained "
+            "(call expand(ref) for omitted items)"
+            if budget_exceeded else
             f"## Omitted: {omitted_count} items not matching query/profile filter → "
             "clear query to include all, or retrievable via expand(ref)"
         )
@@ -1135,10 +1199,7 @@ def fold_with_provenance(
         if others:
             compact_obj["other"] = others
         if omitted_notice:
-            compact_obj["_omitted"] = (
-                f"{omitted_count} items omitted by query/profile filter, not token budget "
-                "(clear query to include all, or call expand(ref))"
-            )
+            compact_obj["_omitted"] = omitted_notice[3:]
         if flagged_notice:
             compact_obj["_flagged"] = f"{len(flagged_ids)} resource(s) entered-in-error or refuted (retained)"
         if gap_notice:
@@ -1229,7 +1290,9 @@ def fold_with_provenance(
                     f"{'/' + c['statusText'] if c.get('statusText') else ''}]"
                     f"{'/' + c['verification'] if c.get('verification') else ''}"
                     f"{' {' + c['category'] + '}' if c.get('category') else ''}"
+                    f"{' (Body site: ' + c['bodySite'] + ')' if c.get('bodySite') else ''}"
                     f"{' (Onset: ' + c['onset'] + ')' if c.get('onset') else ''}"
+                    f"{' (Recorded: ' + c['recorded'] + ')' if c.get('recorded') else ''}"
                     f"{' Note: ' + c['note'] if c.get('note') else ''}"
                 )
         if medications:
@@ -1269,6 +1332,7 @@ def fold_with_provenance(
                 lines.append(
                     f"[{o['ref']}] {o.get('type')} {o.get('name') or o.get('id') or ''}"
                     f"{' [' + o['role'] + ']' if o.get('role') else ''} {o.get('status') or ''}{val_part}"
+                    f"{' (' + o['date'] + ')' if o.get('date') else ''}"
                 )
         if omitted_notice:
             lines.append(f"\n{omitted_notice}")
@@ -1424,13 +1488,13 @@ def fold_with_provenance(
                 rows.append(
                     f"| **{c['ref']}** | {c['condition']} | {c['status']}"
                     f"{(' (' + c['statusText'] + ')') if c.get('statusText') else ''} | "
-                    f"{c.get('verification') or '—'} | {c.get('category') or '—'} | {c.get('onset') or '—'} | "
+                    f"{c.get('verification') or '—'} | {c.get('category') or '—'} | {c.get('bodySite') or '—'} | {c.get('onset') or '—'} | {c.get('recorded') or '—'} | "
                     f"{c.get('note') or '—'} |"
                 )
             sections.append(
                 "### Active Conditions\n"
-                "| Ref | Condition | Status | Verification | Category | Onset | Note |\n"
-                "|---|---|---|---|---|---|---|\n" + "\n".join(rows)
+                "| Ref | Condition | Status | Verification | Category | Body Site | Onset | Recorded | Note |\n"
+                "|---|---|---|---|---|---|---|---|---|\n" + "\n".join(rows)
             )
         if encounters:
             rows = []
@@ -1495,7 +1559,7 @@ def fold_with_provenance(
     else:
         compressed_output = _j({"patient": patients[0]} if patients else {})
 
-    return FoldResult(output=compressed_output, provenance_map=provenance_map)
+    return FoldResult(output=compressed_output, provenance_map=provenance_map, budget_exceeded=budget_exceeded)
 
 
 _fold_options_proxy = type("_Proxy", (), {"only_abnormal_labs": False})()

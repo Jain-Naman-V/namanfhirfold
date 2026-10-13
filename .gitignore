@@ -15,4 +15,4 @@ venv/
 !.env.example
 opencode.json
 testrawecgdata.txt
-
+testbenchmark/

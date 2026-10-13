@@ -1,6 +1,6 @@
 /**
  * Production-ready Rust Implementation: `namanfhirfold`
- * Tagline: "Fold the structure. Keep every detail."
+ * Positioning: FHIR clinical-context and token optimization SDK.
  * Designed for sub-millisecond EHR gateway microservices, CDS Hooks proxies, and Wasm targets.
  */
 
@@ -9,7 +9,7 @@ name = "namanfhirfold"
 version = "0.1.0"
 edition = "2021"
 authors = ["Jain-Naman-V <namanvjain456@gmail.com>"]
-description = "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs"
+description = "FHIR clinical-context and token optimization SDK for CDS Hooks and LLMs"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/naman/namanfhirfold"
@@ -31,7 +31,7 @@ wasm = ["wasm-bindgen"]
 
 export const RUST_COMPACT_CODE = `//! # namanfhirfold 🦀
 //!
-//! > **Fold the structure. Keep every detail.**
+//! > **Optimize clinical context for fewer tokens.**
 //!
 //! Zero-copy FHIR R4 token compression & clinical context extraction engine.
 //! Designed for sub-millisecond Clinical Decision Support (CDS) & LLM reasoning agents.

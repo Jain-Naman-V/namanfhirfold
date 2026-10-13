@@ -136,5 +136,6 @@ pub struct OptimizationResult {
     pub fact_retention_rate: f32,
     pub provenance_map: HashMap<String, ProvenanceEntry>,
     pub omitted_count: usize,
+    pub budget_exceeded: bool,
     pub omitted_notice: Option<String>,
 }

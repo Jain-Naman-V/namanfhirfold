@@ -1,8 +1,8 @@
 # namanfhirfold 📦
 
-> **Fold the structure. Keep every detail.**
+> **Optimize clinical context for fewer tokens.**
 
-High-efficiency task-aware FHIR R4 token compression engine for JavaScript, TypeScript, Node.js, and browser environments. Reduces token usage by **85% to 94%** while preserving 100% of clinical facts, numeric results, units, codes, and ranges.
+High-efficiency task-aware FHIR R4 token compression engine for JavaScript, TypeScript, Node.js, and browser environments. Reduces token usage while preserving the clinical fields covered by the local regression fixtures; unsupported fields must be audited before claiming complete retention.
 
 ---
 
@@ -40,12 +40,29 @@ const compressedContext = compressFhir(rawBundle, {
 console.log(compressedContext.compressedOutput);
 ```
 
+### Contract for package users
+
+All three SDKs accept the same logical input: a FHIR R4 resource or Bundle. The
+serialized form differs by language:
+
+| Package | Input | Output |
+|---|---|---|
+| NPM | JavaScript object / FHIR JSON object | `CompressionResult` with `compressedOutput`, metrics, omission metadata, and local `provenanceMap` |
+| PyPI | Python `dict` or JSON string | `str` from `fold()` or `FoldResult` from `fold_with_provenance()` |
+| Rust | JSON `&str` | `OptimizationResult` with compact output, token metrics, omission metadata, and local provenance |
+
+Supported output formats are `compact_json`, `medprompt_text`,
+`fhirbench_markdown`, and `cds_hooks_prefetch`. The compact output is intended
+for the LLM context; keep provenance local and treat the original FHIR resource
+as the canonical source.
+
 ---
 
 ## 🔓 Decompression: `expand(ref)`
 
-Every fold emits a short reference per retained resource and stores the **full original
-resource** in `result.provenanceMap`, so the round-trip is lossless.
+Every fold emits a short reference per retained resource and can store the original
+resource in `result.provenanceMap` for trusted local expansion. The compact output is a
+task-aware representation; the canonical FHIR source remains authoritative.
 
 | Ref | Resource |
 |---|---|
