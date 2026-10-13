@@ -14,6 +14,15 @@ impl Default for Granularity {
     }
 }
 
+impl Granularity {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Granularity::ExactTimestamp => "exact_timestamp",
+            Granularity::DateOnly => "date_only",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CdsProfile {
@@ -30,18 +39,53 @@ impl Default for CdsProfile {
     }
 }
 
+impl CdsProfile {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CdsProfile::FreeQuery => "free_query",
+            CdsProfile::MedicationPrescribe => "medication_prescribe",
+            CdsProfile::VitalsMonitor => "vitals_monitor",
+            CdsProfile::PatientView => "patient_view",
+            CdsProfile::AcuteInpatient => "acute_inpatient",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum CompressionFormat {
+    #[serde(rename = "compact_json")]
     CompactJson,
+    #[serde(rename = "medprompt_text")]
     MedPromptText,
+    #[serde(rename = "fhirbench_markdown")]
     FhirBenchMarkdown,
+    #[serde(rename = "cds_hooks_prefetch")]
     CdsHooksPrefetch,
 }
 
 impl Default for CompressionFormat {
     fn default() -> Self {
         CompressionFormat::CompactJson
+    }
+}
+
+impl CompressionFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CompressionFormat::CompactJson => "compact_json",
+            CompressionFormat::MedPromptText => "medprompt_text",
+            CompressionFormat::FhirBenchMarkdown => "fhirbench_markdown",
+            CompressionFormat::CdsHooksPrefetch => "cds_hooks_prefetch",
+        }
+    }
+
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s {
+            "medprompt_text" => CompressionFormat::MedPromptText,
+            "fhirbench_markdown" => CompressionFormat::FhirBenchMarkdown,
+            "cds_hooks_prefetch" => CompressionFormat::CdsHooksPrefetch,
+            _ => CompressionFormat::CompactJson,
+        }
     }
 }
 
@@ -62,7 +106,7 @@ impl Default for CompressionOptions {
             format: CompressionFormat::CompactJson,
             profile: CdsProfile::FreeQuery,
             granularity: Granularity::ExactTimestamp,
-            token_budget: Some(800),
+            token_budget: None,
             query_filter: None,
             only_abnormal_labs: false,
             safety_set_guaranteed: true,
@@ -77,82 +121,6 @@ pub struct ProvenanceEntry {
     pub original_id: String,
     pub summary: String,
     pub raw_snippet: serde_json::Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactObservation {
-    pub ref_id: String,
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
-    pub value: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unit: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_time: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub range: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub flag: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactCarePlan {
-    pub ref_id: String,
-    pub category: String,
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub intent: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub period: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub activities: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactMedication {
-    pub ref_id: String,
-    pub drug: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sig: Option<String>,
-    pub status: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactCondition {
-    pub ref_id: String,
-    pub condition: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub onset: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactAllergy {
-    pub ref_id: String,
-    pub allergen: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub criticality: Option<String>,
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reactions: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompactPatient {
-    pub ref_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub gender: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub age: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
