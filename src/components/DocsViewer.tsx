@@ -21,16 +21,16 @@ Clear purpose, memorable, and immediately recognizable to healthcare developers.
 - Why universal compressors fail: Dropping care plan activities, confusing pain scores for lab tests, and losing acute timestamps.
 
 ## The Triad Metric Guarantee
-Evaluation = Token Reduction + Clinical Fact Retention (100%) + Task Accuracy
-- Pain Severity Observation: 248 → 27 tokens (~9.2× fewer input tokens, 100% facts intact)
-- CarePlan Post-Op: 593 → 82 tokens (~7.2× fewer input tokens, 100% facts intact)
+Evaluation = Token Reduction + Fixture-validated Clinical Fact Retention + Task Accuracy
+- Pain Severity Observation: 248 → 27 tokens (~9.2× fewer input tokens; validate against the fixture)
+- CarePlan Post-Op: 593 → 82 tokens (~7.2× fewer input tokens; validate against the fixture)
 - 20-Lab Panel: 4,200 → 280 tokens (~15.0× fewer input tokens)
 
 ## Key Capabilities
 1. Semantic Disambiguation: Vital Signs (Pain, BP) vs Laboratory (CBC, Renal).
 2. Granularity Control: Exact Timestamp (18:21:10) vs Date-Only (YYYY-MM-DD).
 3. Deterministic CDS Profiles: medication_prescribe, vitals_monitor, patient_view.
-4. Guaranteed Safety Set: Allergies, Active Meds, Critical Outliers never dropped.
+4. Safety-first budgeting: Allergies, active meds, patient context, and care plans are prioritized with explicit overflow.
 5. Provenance Map: Short IDs (V1, O1, M1, CP1) with on-demand expand(ref).
 6. Zero Silent Drops: Explicit omission notices when budget prunes older items.
 
@@ -48,7 +48,7 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
 
 ## 6-Stage Execution Pipeline
 1. Parse & Reference Indexing (streaming deserialization)
-2. Lossless Structural Strip (meta, text.div XHTML, 80-char system URIs)
+2. Structural Context Reduction (meta, text.div XHTML, 80-char system URIs)
 3. Dedupe & Safety Filtration (drop entered-in-error, refuted, dedupe providers)
 4. Task-Aware Selection (Deterministic CDS Profiles vs Free-Form Agent)
 5. Ranking & Token Budgeting (Guaranteed Must-Include Safety Set)
@@ -80,16 +80,16 @@ Not an end-user chatbot. A foundational healthcare context optimization layer be
 3. Healthcare RAG & Agent Builders (grounding models with provenance traceability).
 
 ## Key Differentiators vs FHIRBench / MEDPrompt
-- Triad Metric: Measures and enforces 100% Fact Retention, not just token drop.
+- Triad Metric: Measures clinical retention using explicit fixtures, not just token drop.
 - CarePlan Preservation: Full clinical activities ("Rest for 72 hrs", "Limit activity") preserved.
 - Temporal Granularity: Exact timestamp option for acute care vs date-only for chronic care.
 - Provenance Reversibility: Every item links to raw FHIR via expand(ref).
 
-## Clinical Safety Invariants
+## Clinical Safety Boundaries
 - Unit Invariance: Units are never mutated or converted silently.
-- Error Filtering: Resources marked entered-in-error are never forwarded.
+- Error Handling: Resources marked entered-in-error or refuted are retained and flagged rather than silently discarded.
 - Zero Silent Drops: Pruned historical records always emit an explicit omission notice.
-- HIPAA Compliant: Stateless transformation; zero patient data persisted.`,
+- Deployment governance: Stateless core transformation; operators remain responsible for access control, retention, logging, and regulatory compliance.`,
 
     deployment: `# namanfhirfold Deployment & Vercel Services Runbook 🚀
 ### Fold the structure. Keep every detail.

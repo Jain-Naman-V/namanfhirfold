@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "namanfhirfold"
 version = "0.1.0"
-description = "Fold the structure. Keep every detail. High-efficiency task-aware FHIR R4 token compression engine for CDS Hooks and LLMs."
+description = "FHIR clinical-context and token optimization SDK for CDS Hooks and LLMs."
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"

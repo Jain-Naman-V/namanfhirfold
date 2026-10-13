@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { compressFhir } from "./src/services/fhirCompressor.ts";
 import { CompressionOptions } from "./src/types/fhir.ts";
 import { askCds, llmConfigured, llmModelName } from "./llm.ts";
+import { sanitizePublicCompressionResponse, toPublicCompressionResult } from "./src/services/publicCompressionResult.ts";
 
 dotenv.config();
 
@@ -12,6 +13,30 @@ const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === "production";
 
 app.use(express.json({ limit: "25mb" }));
+
+const apiToken = process.env.NAMANFHIRFOLD_API_TOKEN;
+const production = process.env.NODE_ENV === "production";
+
+function authorizeApi(req: Request, res: Response): boolean {
+  if (!production && !apiToken) return true;
+  if (!apiToken) {
+    res.status(503).json({ error: "API authentication is not configured" });
+    return false;
+  }
+  if (req.header("authorization") !== `Bearer ${apiToken}`) {
+    res.status(401).json({ error: "Unauthorized" });
+    return false;
+  }
+  return true;
+}
+
+app.use((req: Request, res: Response, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  if (req.path.startsWith("/api/") && req.path !== "/api/health" && !authorizeApi(req, res)) return;
+  next();
+});
 
 // API: Compress FHIR payload
 app.post("/api/compress", async (req: Request, res: Response) => {
@@ -34,7 +59,7 @@ app.post("/api/compress", async (req: Request, res: Response) => {
         if (pyRes.ok) {
           const pyData = await pyRes.json();
           return res.json({
-            ...pyData,
+            ...(sanitizePublicCompressionResponse(pyData) as object),
             engine: "namanfhirfold-python-service",
           });
         }
@@ -54,7 +79,7 @@ app.post("/api/compress", async (req: Request, res: Response) => {
     };
 
     const result = compressFhir(fhir, defaultOpts);
-    return res.json(result);
+    return res.json(toPublicCompressionResult(result));
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to compress FHIR payload" });
   }
@@ -62,8 +87,8 @@ app.post("/api/compress", async (req: Request, res: Response) => {
 
 // API: Evaluate LLM on clinical query with raw vs compressed context
 app.post("/api/evaluate-llm", async (req: Request, res: Response) => {
-  const { query, context, formatName } = req.body;
-  if (!query || !context) {
+  const { query, context } = req.body;
+  if (typeof query !== "string" || typeof context !== "string" || !query || !context || query.length > 10_000 || context.length > 100_000) {
     return res.status(400).json({ error: "Missing query or context" });
   }
 

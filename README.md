@@ -1,16 +1,16 @@
 # namanfhirfold 🦀📦🐍
-### Fold the structure. Keep every detail.
+### FHIR Clinical-Context and Token Optimization SDK
 **Task-Aware Clinical Context Optimizer & Token Reducer for Healthcare AI & CDS Hooks**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![FHIR Version: R4 / R5](https://img.shields.io/badge/FHIR-R4%20%2F%20R5-orange.svg)](https://hl7.org/fhir/)
 [![Token Reduction](https://img.shields.io/badge/Input%20Tokens--85%25%20to%20--94%25-emerald.svg)]()
-[![Clinical Fidelity](https://img.shields.io/badge/Fact%20Retention-100%25%20goal-purple.svg)]()
+[![Clinical Fidelity](https://img.shields.io/badge/Fact%20Retention-fixture--validated-purple.svg)]()
 [![Crates.io](https://img.shields.io/badge/crates.io-namanfhirfold-orange.svg)](https://crates.io)
 [![NPM](https://img.shields.io/badge/npm-namanfhirfold-red.svg)](https://npmjs.com)
 [![PyPI](https://img.shields.io/badge/pypi-namanfhirfold-blue.svg)](https://pypi.org)
 
-> **"Fold the structure. Keep every detail."**  
+> **"Optimize clinical context for fewer tokens."**  
 > *Clear purpose, memorable, and immediately recognizable to healthcare developers.*
 
  See how namanfhirfold folds a raw FHIR bundle into a 67-token LLM-ready payload in real time.
@@ -40,7 +40,7 @@ Blindly minifying or dropping fields creates severe medical risks:
 
 ## 💡 The Solution: namanfhirfold (`namanfhirfold`)
 
-namanfhirfold sits as an intelligent, high-throughput gateway proxy between the EHR and the AI layer. **FHIR remains the untouched canonical source-of-truth**, while namanfhirfold dynamically synthesizes a lossless, information-dense clinical payload tuned to the specific task or CDS Hook.
+namanfhirfold sits as an intelligent, high-throughput gateway proxy between the EHR and the AI layer. **FHIR remains the untouched canonical source-of-truth**, while namanfhirfold dynamically synthesizes an information-dense clinical context tuned to the specific task or CDS Hook.
 
 ```
        EHR / SMART on FHIR Server (Canonical Source)
@@ -50,7 +50,7 @@ namanfhirfold sits as an intelligent, high-throughput gateway proxy between the 
 ┌────────────────────────────────────────────────────────┐
 │  namanfhirfold Gateway (Rust / TypeScript)     │
 │  1. Parse & Index References                           │
-│  2. Lossless Structural Strip (meta, text.div, URIs)   │
+│  2. Structural Context Reduction (meta, text.div, URIs)│
 │  3. Dedupe & Safety Filter (drop entered-in-error)     │
 │  4. Task-Aware Selection (CDS Profiles vs Free Query)  │
 │  5. Ranking & Token Budget Allocator (Safety Set Lock) │
@@ -79,7 +79,7 @@ $$\text{Evaluation Metric} = \text{Input Token Reduction} + \text{Clinical Infor
 | **Post-Op Surgery CarePlan** | 593 tokens | **82 tokens** | **~7.2× fewer input tokens** |
 | **20-Lab Metabolic Panel** | 4,200 tokens | **280 tokens** | **~15.0× fewer input tokens** |
 | **Inpatient CDS Stay Bundle** | 12,850 tokens | **840 tokens** | **~15.3× fewer input tokens** |
-| **Clinical Facts Preserved** | 100% | **100% (design goal)** | **Target: zero clinical loss** |
+| **Clinical Facts Preserved** | Fixture-validated | **Validated per supported fixture/format** | **Unrecognized fields require audit** |
 | **Provenance Traceability** | None | **100% (V1, O1, M1, CP1)** | **Auditable via `expand(ref)`** |
 
 ---
@@ -91,13 +91,23 @@ $$\text{Evaluation Metric} = \text{Input Token Reduction} + \text{Clinical Infor
   - `exact_timestamp`: Retains full ISO timestamps (`2015-06-05T18:21:10-04:00`) for acute vitals, ICU, and pain scales.
   - `date_only`: Day-level format (`2015-06-05`) for chronic problem lists and annual health records.
 - **Deterministic CDS Profiles:** Ultra-fast, deterministic rule-based selection for CDS Hooks (`medication-prescribe`, `patient-view`, `vitals-monitor`) that bypass slow, unpredictable LLM planners.
-- **Guaranteed Safety Set:** Active medications, allergies/adverse reactions, critical abnormal lab values, and active care plan instructions are **never dropped**.
+- **Safety Set:** Patient, allergy, active medication, and care-plan resources are prioritized under a token budget; if they alone exceed it, the result reports explicit overflow.
 - **Provenance Map & `expand(ref)` Tool:** Every item receives a compact reference code (`O1`, `V1`, `M1`, `CP1`) mapping directly to its original FHIR Resource ID. AI agents can invoke `expand(ref)` to retrieve the full raw FHIR slice on-demand.
-- **Zero Silent Drops:** When token budgeting omits non-pertinent historical records, an explicit omission notice is appended: `## Omitted: N older items → retrievable via expand(ref)`.
+- **Zero Silent Drops:** When selection or token budgeting omits records, an explicit omission notice and count are appended; trusted in-process callers can use `expand(ref)`.
 
 ---
 
 ## 📦 Installation & SDK Packages
+
+The same optimization contract is available in three package formats:
+
+| Package | Input | Output |
+|---|---|---|
+| NPM | JavaScript FHIR object / Bundle | `CompressionResult` and compact `compressedOutput` |
+| PyPI | Python `dict` or JSON string | Compact `str` or `FoldResult` with local provenance |
+| Rust | FHIR JSON `&str` | `OptimizationResult` with compact output and metrics |
+
+All formats support compact JSON, MedPrompt text, FHIRBench Markdown, and CDS Hooks prefetch output. The compact result is for model context; the canonical FHIR payload remains the source of truth.
 
 ### TypeScript / Node.js / Bun (NPM)
 ```bash
@@ -153,7 +163,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let raw_fhir_json = std::fs::read_to_string("patient_bundle.json")?;
     
     // Sub-millisecond zero-copy optimization (<1.2ms)
-    // "Fold the structure. Keep every detail."
+    // "Optimize clinical context for fewer tokens."
     let result = optimize(&raw_fhir_json, &CompressionOptions {
         profile: CdsProfile::VitalsMonitor,
         granularity: Granularity::ExactTimestamp,
@@ -179,7 +189,7 @@ from namanfhirfold import fold, CdsProfile, Granularity
 
 raw_bundle = load_ehr_fhir_bundle()
 
-# "Fold the structure. Keep every detail."
+# "Optimize clinical context for fewer tokens."
 compressed_output = fold(
     raw_bundle,
     format="compact_json",         # or "medprompt_text", "markdown"
@@ -212,7 +222,7 @@ const optimizedContext = compressFhir(rawBundle, {
 ## 🔓 Decompression: Getting the FHIR Back (`expand(ref)`)
 
 Folding is one direction. Every compact output carries a **provenance map** that stores the
-**full original resource** for each short reference, so the fold round-trips losslessly.
+**full original resource** for each short reference when the local provenance map is retained; the compact output itself remains a task-aware representation.
 
 ### Short reference legend
 

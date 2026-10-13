@@ -47,11 +47,13 @@ export async function askCds(
         { role: "user", content: buildPrompt(query, context) },
       ],
     }),
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`OpenAI API error ${res.status}: ${body.slice(0, 300)}`);
+    console.error("LLM upstream failure", { status: res.status, bodyPreview: body.slice(0, 300) });
+    throw new Error("LLM inference failed");
   }
 
   const data = await res.json();

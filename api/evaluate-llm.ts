@@ -6,8 +6,16 @@ export default async function handler(req: Request, res: Response) {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
 
+  const token = process.env.NAMANFHIRFOLD_API_TOKEN;
+  if (!token) {
+    return res.status(503).json({ error: "API authentication is not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${token}`) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const { query, context } = req.body || {};
-  if (!query || !context) {
+  if (typeof query !== "string" || typeof context !== "string" || !query || !context || query.length > 10_000 || context.length > 100_000) {
     return res.status(400).json({ error: "Missing query or context" });
   }
 
@@ -16,7 +24,7 @@ export default async function handler(req: Request, res: Response) {
   if (!llmConfigured) {
     const latency = Date.now() - startTime;
     return res.json({
-      answer: `[Clinical Decision Support / LLM Simulation]\n\nClinical Query: "${query}"\n\nPreserved Patient Context: The clinical facts, observations, and care instructions were analyzed with 100% fidelity.\n\n(Note: Set OPENAI_API_KEY in your Vercel Environment Variables to enable live ${llmModelName} clinical reasoning. Compression works without it.)`,
+      answer: `[Clinical Decision Support / LLM Simulation]\n\nClinical Query: "${query}"\n\nPreserved Patient Context: The validated compressed clinical context was supplied to the model. Review the source FHIR resource when a field is outside the supported retention contract.\n\n(Note: Set OPENAI_API_KEY in your Vercel Environment Variables to enable live ${llmModelName} clinical reasoning. Compression works without it.)`,
       latencyMs: latency + 150,
       modelUsed: `${llmModelName} (simulated)`,
       tokenEstimate: Math.round(context.length / 3.8),

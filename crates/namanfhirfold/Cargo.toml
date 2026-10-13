@@ -3,7 +3,7 @@ name = "namanfhirfold"
 version = "0.1.0"
 edition = "2021"
 authors = ["Jain-Naman-V <namanvjain456@gmail.com>"]
-description = "Fold the structure. Keep every detail. Task-aware FHIR R4 token compression engine for CDS Hooks and LLMs."
+description = "FHIR clinical-context and token optimization SDK for CDS Hooks and LLMs."
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Jain-Naman-V/namanfhirfold"
@@ -12,7 +12,7 @@ categories = ["text-processing", "parsing", "web-programming"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
 chrono = { version = "0.4", features = ["serde"], default-features = false }
 wasm-bindgen = { version = "0.2", optional = true }
 

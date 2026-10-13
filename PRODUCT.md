@@ -1,5 +1,5 @@
 # namanfhirfold Product Specification
-### Fold the structure. Keep every detail.
+### FHIR Clinical-Context and Token Optimization SDK
 **Product Requirements Document (PRD) & Market Positioning**
 *Available on Crates.io (Rust), NPM (TypeScript), and PyPI (Python)*
 
@@ -8,8 +8,7 @@
 ## 1. Product Positioning & The Core Problem
 
 ### The Product: `namanfhirfold`
-> **Tagline:** *"Fold the structure. Keep every detail."*  
-> **Clear purpose, memorable, and immediately recognizable to healthcare developers.**
+> **Positioning:** Optimize clinical context for fewer tokens.
 
 Large Language Models (LLMs) possess extraordinary potential for clinical reasoning, medication reconciliation, and diagnostic triage. However, integrating LLMs into hospital Electronic Health Records (EHRs) faces a crippling economic and technical barrier: **FHIR Token Bloat**.
 
@@ -33,11 +32,11 @@ namanfhirfold is **not an end-user chatbot or EHR viewer**. It is a **foundation
 
 ### Persona 1: Clinical AI / LLM Agent Engineers
 - **Need:** Providing patient history to OpenAI, Gemini, Anthropic, or open-source models without blowing context windows or budget.
-- **namanfhirfold Value:** Reduces input tokens by **85% to 94%** with a design goal of **100% clinical fact preservation** (the safety set is enforced in code; full-corpus validation is tracked in Phase 4).
+- **namanfhirfold Value:** Reduces input token load while exposing explicit retention, omission, and budget metadata for the supported clinical contract.
 
 ### Persona 2: Hospital CDS Hooks Developers
 - **Need:** Building Clinical Decision Support (CDS) card services for Epic or Cerner Millennium. Hospital gateways require responses in **<500ms**.
-- **namanfhirfold Value:** Zero-copy Rust microservice delivers deterministic, sub-millisecond filtering (`<1.5ms`), ensuring compliance with strict EHR timeouts.
+- **namanfhirfold Value:** Rust, TypeScript, and Python implementations support deterministic filtering; production latency must be benchmarked against the target EHR workload.
 
 ### Persona 3: Healthcare RAG & Agentic Workflow Builders
 - **Need:** Grounding vector embeddings or AI agents without hallucinating or losing provenance back to the EHR.
@@ -61,8 +60,8 @@ Intelligently categorizes observations based on LOINC and FHIR category into:
 - `labs`: CBC, Metabolic panels, Lipids, Urinalysis.
 - `carePlans`: Post-op protocols, physical restrictions, activities.
 
-### Feature 4: Guaranteed Safety Set
-The optimizer guarantees that certain high-consequence items are **never dropped**, regardless of how tight the token budget is:
+### Feature 4: Safety-First Budgeting
+The optimizer prioritizes high-consequence items and reports explicit overflow when the requested budget cannot contain them:
 - Active drug allergies & criticalities.
 - Current active prescriptions.
 - Critical abnormal laboratory flags (`High`, `Low`, `Critical`).
@@ -83,7 +82,7 @@ to inspect the raw canonical FHIR slice whenever in doubt.
 |---|---|---|---|---|
 | **Input Tokens** | 4,200 (Baseline) | ~750 (-82%) | ~420 (-90%) | **~280 (-93.4%)** |
 | **Input Token Ratio** | 1.0× | ~5.6× fewer | ~10.0× fewer | **~15.0× fewer** |
-| **Fact Retention Rate** | 100% | 94% | 91% | **100% (design goal)** |
+| **Fact Retention Rate** | 100% | 94% | 91% | **Fixture-validated; audit your contract** |
 | **CarePlan Activities** | Verbose | Often dropped | Flattened | **Fully preserved** |
 | **Vitals vs Labs Distinction**| Mixed | Flat table | Bullets | **Strict semantic arrays** |
 | **Temporal Granularity** | Full ISO | Date only | Date only | **Selectable (Exact vs Date)** |
@@ -93,12 +92,12 @@ to inspect the raw canonical FHIR slice whenever in doubt.
 
 ---
 
-## 5. Clinical Safety & Regulatory Invariants
+## 5. Clinical Safety & Regulatory Boundaries
 
 1. **Unit Invariance:** Never silently mutate or convert units of measure (e.g. `g/dL` remains `g/dL`).
-2. **Negation & Error Preservation:** Resources marked `entered-in-error` or `refuted` are never silently forwarded as true clinical findings.
+2. **Negation & Error Preservation:** Resources marked `entered-in-error` or `refuted` are retained and flagged rather than silently discarded.
 3. **No Silent Drops:** Omitted historical records always output an auditable notice: `## Omitted: N items → retrievable via expand(ref)`.
-4. **HIPAA & Zero-Data-Persistence:** namanfhirfold is a stateless transformation engine. In production deployments, zero patient records or PHI are persisted to disk or cloud storage.
+4. **Compliance Boundary:** The core is stateless, but deployment operators remain responsible for authentication, logging, retention, provider agreements, and regulatory compliance.
 
 ---
 
@@ -106,7 +105,7 @@ to inspect the raw canonical FHIR slice whenever in doubt.
 
 ### Phase 1: Core Foundation (Current Release)
 - [x] Observations, MedicationRequests, Conditions, AllergyIntolerances, CarePlans, Encounters.
-- [x] Lossless structural stripping + prefix dictionary.
+- [x] Structural reduction + prefix dictionary.
 - [x] Triad evaluation harness & live Fact Auditor.
 - [x] Split-screen interactive workbench with live Gemini 3.8 Flash evaluation.
 

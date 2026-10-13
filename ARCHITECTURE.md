@@ -1,14 +1,14 @@
 # namanfhirfold Architecture Specification
 ### Fold the structure. Keep every detail.
-**High-Performance Zero-Copy Task-Aware Clinical Context Engine in Rust, TypeScript, and Python**
+**FHIR Clinical-Context and Token Optimization SDK in Rust, TypeScript, and Python**
 
 ---
 
 ## 1. Executive Summary & Design Contract
 
 > **`namanfhirfold`**  
-> **Tagline:** *"Fold the structure. Keep every detail."*  
-> **Mission:** Fold verbose nested FHIR R4 schema scaffolding while preserving 100% of clinical fidelity, codes, numbers, units, and timestamps.
+> **Tagline:** *"Optimize clinical context for fewer tokens."*  
+> **Mission:** Reduce verbose FHIR R4 scaffolding while retaining the clinical fields covered by the supported contract.
 
 `namanfhirfold` is not a simple JSON minifier. It is an **information-theoretic clinical context engine** implemented in zero-copy Rust with TypeScript and Python ecosystem bridges. 
 
@@ -21,7 +21,7 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
 ### Architectural Axioms:
 1. **FHIR is the Canonical Source of Truth:** Never mutate or replace FHIR repositories in the EHR. namanfhirfold operates strictly as an edge gateway or proxy before inference.
 2. **Task-Aware > Universal Compression:** Compression without clinical task context is dangerous. A prescription review requires different fields than an ICU vitals trend check.
-3. **Guaranteed Safety Set:** Allergies, active medications, critical abnormal values, and active care plan instructions are **never silently dropped**.
+3. **Safety prioritization:** Allergies, active medications, patient context, and care plans are prioritized, with explicit budget overflow metadata.
 4. **Reversible via Provenance:** Every compressed line carries a short reference (`O1`, `V1`, `M1`, `CP1`) mapping back to the raw FHIR resource ID. If an agent requires deeper context, it invokes `expand(ref)`.
 5. **Deterministic Latency for CDS Hooks:** For real-time CDS hooks (e.g. Epic/Cerner <500ms timeout), profile selection is deterministic and rule-based—no slow LLM planning step.
 
@@ -45,7 +45,7 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
 │  └────────────────────────┬─────────────────────────┘  │
 │                           ▼                            │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │ Stage 2: Lossless Structural Strip               │  │
+│  │ Stage 2: Structural Context Reduction            │  │
 │  │          (meta, text.div, URIs, search wrappers) │  │
 │  └────────────────────────┬─────────────────────────┘  │
 │                           ▼                            │
@@ -94,7 +94,7 @@ optimize(bundle: FhirBundle, intent: ClinicalIntent, token_budget: Option<usize>
 - Fast zero-copy streaming deserialization (`serde_json::Value` or native Rust structs).
 - Builds an in-memory graph index of internal pointers (`subject`, `encounter`, `careTeam`, `performer`).
 
-### Stage 2: Lossless Structural Strip
+### Stage 2: Structural Context Reduction
 Removes schema boilerplate that confers zero clinical semantics:
 - Strips `meta.profile`, `meta.versionId`, `meta.lastUpdated`.
 - Strips `text.div` XHTML narrative snippets (often hundreds of bytes of redundant HTML per observation).
@@ -129,7 +129,7 @@ For strict latency and compliance constraints, hard-coded declarative profiles s
 
 ### Stage 5: Ranking, Budgeting, & Must-Include Safety Set
 When a `token_budget` (e.g. 800 tokens) is specified:
-1. **Safety Set Guarantee (Never Dropped):**
+1. **Safety Set Priority:**
    - Active Allergies & Severe Criticalities
    - Current Active Prescriptions
    - Critical Outlier Observations (Interpretation `H`, `L`, `Critical`)

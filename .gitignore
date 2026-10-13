@@ -14,7 +14,8 @@ venv/
 .env*
 !.env.example
 opencode.json
-
+testrawecgdata.txt
+testbenchmark/
 
 # HyperFrames launch-video output (22 MB artifacts - do not commit)
 brag-output-*/
