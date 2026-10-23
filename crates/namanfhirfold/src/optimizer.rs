@@ -632,47 +632,70 @@ pub fn fold_with_provenance(data: &Value, options: &CompressionOptions) -> Resul
             .collect()
     } else if let Some(qf) = query_filter.as_ref().filter(|q| !q.trim().is_empty()) {
         let q_lower = qf.to_lowercase();
-        let mut sel: Vec<Value> = valid_resources
-            .iter()
-            .filter(|res| {
-                let rt = get_str(res, "resourceType").unwrap_or("");
-                let res_str = json_str(res).to_lowercase();
-                if res_str.contains(&q_lower) {
-                    return true;
-                }
-                if q_lower.contains("pain") && (res_str.contains("pain") || rt == "Observation") {
-                    return true;
-                }
-                if q_lower.contains("vital") && is_vital_sign(res) {
-                    return true;
-                }
-                if ["care", "plan", "activity", "surgery", "recovery"].iter().any(|w| q_lower.contains(w)) {
-                    if rt == "CarePlan" {
+        let broad_terms = [
+            "all", "summary", "overview", "insight", "insights", "everything",
+            "complete", "full", "chart", "record", "records", "history", "profile", "review", "report"
+        ];
+        let is_broad = broad_terms.iter().any(|w| q_lower.contains(w));
+
+        let mut sel: Vec<Value> = if is_broad {
+            valid_resources.clone()
+        } else {
+            valid_resources
+                .iter()
+                .filter(|res| {
+                    let rt = get_str(res, "resourceType").unwrap_or("");
+                    if options.safety_set_guaranteed {
+                        if rt == "Patient" || rt == "AllergyIntolerance" {
+                            return true;
+                        }
+                        if rt.starts_with("Medication")
+                            && get_str(res, "status") != Some("stopped")
+                            && get_str(res, "status") != Some("entered-in-error")
+                        {
+                            return true;
+                        }
+                    }
+
+                    let res_str = json_str(res).to_lowercase();
+                    if res_str.contains(&q_lower) {
                         return true;
                     }
-                }
-                if ["lab", "blood", "test"].iter().any(|w| q_lower.contains(w)) {
-                    if rt == "Observation" && !is_vital_sign(res) {
+                    if q_lower.contains("pain") && (res_str.contains("pain") || rt == "Observation") {
                         return true;
                     }
-                }
-                if ["med", "drug", "dose"].iter().any(|w| q_lower.contains(w)) {
-                    if rt.starts_with("Medication") {
+                    if (q_lower.contains("vital") || q_lower.contains("bp") || q_lower.contains("pressure") || q_lower.contains("pulse") || q_lower.contains("temp")) && is_vital_sign(res) {
                         return true;
                     }
-                }
-                if q_lower.contains("allergy") && rt == "AllergyIntolerance" {
-                    return true;
-                }
-                if ["condition", "diagnosis"].iter().any(|w| q_lower.contains(w)) {
-                    if rt == "Condition" {
+                    if ["care", "plan", "activity", "protocol", "recovery"].iter().any(|w| q_lower.contains(w)) && rt == "CarePlan" {
                         return true;
                     }
-                }
-                false
-            })
-            .cloned()
-            .collect();
+                    if ["lab", "blood", "test", "panel", "result", "finding", "pefr", "spo2", "hba1c"].iter().any(|w| q_lower.contains(w)) && rt == "Observation" && !is_vital_sign(res) {
+                        return true;
+                    }
+                    if ["med", "drug", "dose", "rx", "prescription", "pharmacy"].iter().any(|w| q_lower.contains(w)) && rt.starts_with("Medication") {
+                        return true;
+                    }
+                    if ["allergy", "allergies", "intolerance", "reaction"].iter().any(|w| q_lower.contains(w)) && rt == "AllergyIntolerance" {
+                        return true;
+                    }
+                    if ["condition", "diagnosis", "problem", "disease", "illness"].iter().any(|w| q_lower.contains(w)) && rt == "Condition" {
+                        return true;
+                    }
+                    if ["encounter", "visit", "admission", "consult", "clinic", "appointment", "stay", "surgery"].iter().any(|w| q_lower.contains(w)) && rt == "Encounter" {
+                        return true;
+                    }
+                    if ["procedure", "operation", "intervention"].iter().any(|w| q_lower.contains(w)) && rt == "Procedure" {
+                        return true;
+                    }
+                    if ["vaccine", "vaccination", "immunization", "shot"].iter().any(|w| q_lower.contains(w)) && rt == "Immunization" {
+                        return true;
+                    }
+                    false
+                })
+                .cloned()
+                .collect()
+        };
         if sel.is_empty() {
             sel = valid_resources.clone();
         }

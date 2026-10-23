@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "namanfhirfold"
-version = "0.1.0"
+version = "0.2.1"
 description = "FHIR clinical-context and token optimization SDK for CDS Hooks and LLMs."
 readme = "README.md"
 requires-python = ">=3.8"

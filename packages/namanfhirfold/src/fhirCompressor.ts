@@ -342,27 +342,38 @@ export function compressFhir(
   } else if (options.queryFilter && options.queryFilter.trim().length > 0) {
     // Free query matching
     const qLower = options.queryFilter.toLowerCase().trim();
-    selectedResources = validResources.filter((res) => {
-      const resStr = JSON.stringify(res).toLowerCase();
-      if (resStr.includes(qLower)) return true;
-      if (qLower.includes("pain") && (resStr.includes("pain") || res.resourceType === "Observation")) return true;
-      if (qLower.includes("vital") && isVitalSign(res)) return true;
-      if (qLower.includes("care") || qLower.includes("plan") || qLower.includes("activity") || qLower.includes("surgery") || qLower.includes("recovery")) {
-        if (res.resourceType === "CarePlan") return true;
-      }
-      if (qLower.includes("lab") || qLower.includes("blood") || qLower.includes("test")) {
-        if (res.resourceType === "Observation" && !isVitalSign(res)) return true;
-      }
-      if (qLower.includes("med") || qLower.includes("drug") || qLower.includes("dose")) {
-        if (res.resourceType.startsWith("Medication")) return true;
-      }
-      if (qLower.includes("allergy") && res.resourceType === "AllergyIntolerance") return true;
-      if (qLower.includes("condition") || qLower.includes("diagnosis")) {
-        if (res.resourceType === "Condition") return true;
-      }
-      return false;
-    });
-    if (selectedResources.length === 0) selectedResources = validResources;
+    const broadTerms = [
+      "all", "summary", "overview", "insight", "insights", "everything",
+      "complete", "full", "chart", "record", "records", "history", "profile", "review", "report"
+    ];
+    const isBroad = broadTerms.some((w) => qLower.includes(w));
+
+    if (isBroad) {
+      selectedResources = validResources;
+    } else {
+      selectedResources = validResources.filter((res) => {
+        const rt = res.resourceType || "";
+        if (options.safetySetGuaranteed !== false) {
+          if (rt === "Patient" || rt === "AllergyIntolerance") return true;
+          if (rt.startsWith("Medication") && res.status !== "stopped" && res.status !== "entered-in-error") return true;
+        }
+
+        const resStr = JSON.stringify(res).toLowerCase();
+        if (resStr.includes(qLower)) return true;
+        if (qLower.includes("pain") && (resStr.includes("pain") || rt === "Observation")) return true;
+        if ((qLower.includes("vital") || qLower.includes("bp") || qLower.includes("pressure") || qLower.includes("pulse") || qLower.includes("temp")) && isVitalSign(res)) return true;
+        if (["care", "plan", "activity", "protocol", "recovery"].some((w) => qLower.includes(w)) && rt === "CarePlan") return true;
+        if (["lab", "blood", "test", "panel", "result", "finding", "pefr", "spo2", "hba1c"].some((w) => qLower.includes(w)) && rt === "Observation" && !isVitalSign(res)) return true;
+        if (["med", "drug", "dose", "rx", "prescription", "pharmacy"].some((w) => qLower.includes(w)) && rt.startsWith("Medication")) return true;
+        if (["allergy", "allergies", "intolerance", "reaction"].some((w) => qLower.includes(w)) && rt === "AllergyIntolerance") return true;
+        if (["condition", "diagnosis", "problem", "disease", "illness"].some((w) => qLower.includes(w)) && rt === "Condition") return true;
+        if (["encounter", "visit", "admission", "consult", "clinic", "appointment", "stay", "surgery"].some((w) => qLower.includes(w)) && rt === "Encounter") return true;
+        if (["procedure", "operation", "intervention"].some((w) => qLower.includes(w)) && rt === "Procedure") return true;
+        if (["vaccine", "vaccination", "immunization", "shot"].some((w) => qLower.includes(w)) && rt === "Immunization") return true;
+        return false;
+      });
+      if (selectedResources.length === 0) selectedResources = validResources;
+    }
   }
 
   const safetyResource = (res: any): boolean => {

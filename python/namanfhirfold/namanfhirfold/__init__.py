@@ -16,7 +16,7 @@ from .core import (
     CompressionFormat,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"
 __all__ = [
     "fold",
     "fold_with_provenance",

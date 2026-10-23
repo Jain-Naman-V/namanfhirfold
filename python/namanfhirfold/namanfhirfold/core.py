@@ -513,33 +513,55 @@ def fold_with_provenance(
     elif query_filter and query_filter.strip():
         q_lower = query_filter.lower().strip()
 
-        def keep(res: Dict[str, Any]) -> bool:
-            rt = res.get("resourceType") or ""
-            res_str = json.dumps(res).lower()
-            if q_lower in res_str:
-                return True
-            if "pain" in q_lower and ("pain" in res_str or rt == "Observation"):
-                return True
-            if "vital" in q_lower and is_vital_sign(res):
-                return True
-            if any(w in q_lower for w in ("care", "plan", "activity", "surgery", "recovery")):
-                if rt == "CarePlan":
-                    return True
-            if any(w in q_lower for w in ("lab", "blood", "test")):
-                if rt == "Observation" and not is_vital_sign(res):
-                    return True
-            if any(w in q_lower for w in ("med", "drug", "dose")):
-                if rt.startswith("Medication"):
-                    return True
-            if "allergy" in q_lower and rt == "AllergyIntolerance":
-                return True
-            if any(w in q_lower for w in ("condition", "diagnosis")):
-                if rt == "Condition":
-                    return True
-            return False
-        selected_resources = [r for r in valid_resources if keep(r)]
-        if not selected_resources:
+        # Broad/comprehensive intent check: summary, all info, overview, insights
+        broad_terms = (
+            "all", "summary", "overview", "insight", "insights", "everything",
+            "complete", "full", "chart", "record", "records", "history", "profile", "review", "report"
+        )
+        is_broad = any(w in q_lower for w in broad_terms)
+
+        if is_broad:
             selected_resources = valid_resources
+        else:
+            def keep(res: Dict[str, Any]) -> bool:
+                rt = res.get("resourceType") or ""
+
+                if safety_set_guaranteed:
+                    if rt == "Patient":
+                        return True
+                    if rt == "AllergyIntolerance":
+                        return True
+                    if rt.startswith("Medication") and res.get("status") not in ("stopped", "entered-in-error"):
+                        return True
+
+                res_str = json.dumps(res).lower()
+                if q_lower in res_str:
+                    return True
+                if "pain" in q_lower and ("pain" in res_str or rt == "Observation"):
+                    return True
+                if ("vital" in q_lower or "bp" in q_lower or "pressure" in q_lower or "pulse" in q_lower or "temp" in q_lower) and is_vital_sign(res):
+                    return True
+                if any(w in q_lower for w in ("care", "plan", "activity", "protocol", "recovery")) and rt == "CarePlan":
+                    return True
+                if any(w in q_lower for w in ("lab", "blood", "test", "panel", "result", "finding", "pefr", "spo2", "hba1c")) and rt == "Observation" and not is_vital_sign(res):
+                    return True
+                if any(w in q_lower for w in ("med", "drug", "dose", "rx", "prescription", "pharmacy")) and rt.startswith("Medication"):
+                    return True
+                if any(w in q_lower for w in ("allergy", "allergies", "intolerance", "reaction")) and rt == "AllergyIntolerance":
+                    return True
+                if any(w in q_lower for w in ("condition", "diagnosis", "problem", "disease", "illness")) and rt == "Condition":
+                    return True
+                if any(w in q_lower for w in ("encounter", "visit", "admission", "consult", "clinic", "appointment", "stay", "surgery")) and rt == "Encounter":
+                    return True
+                if any(w in q_lower for w in ("procedure", "operation", "intervention")) and rt == "Procedure":
+                    return True
+                if any(w in q_lower for w in ("vaccine", "vaccination", "immunization", "shot")) and rt == "Immunization":
+                    return True
+                return False
+
+            selected_resources = [r for r in valid_resources if keep(r)]
+            if not selected_resources:
+                selected_resources = valid_resources
 
     if token_budget and token_budget > 0:
         def is_safety(res: Dict[str, Any]) -> bool:
